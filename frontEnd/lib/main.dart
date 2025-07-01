@@ -139,7 +139,7 @@ class _AuthScreenState extends State<AuthScreen> {
         final userId = token.split('-').last;
         widget.onLoginSuccess(token, userId);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registo e login bem-sucedidos!')),
+          const SnackBar(content: Text('Registo e logon bem-sucedidos!')),
         );
       }
     } catch (e) {
