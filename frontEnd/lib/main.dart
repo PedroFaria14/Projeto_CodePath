@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart'
-    as http; // Importe para garantir que está disponível
-import 'package:codepath/services/api_service.dart'; // Importe o seu ApiService
-import 'package:shared_preferences/shared_preferences.dart'; // Para armazenar o token
+import 'package:http/http.dart' as http;
+import 'package:codepath/services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const CodePathApp());
