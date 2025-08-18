@@ -30,3 +30,9 @@ class TelaInicial(tk.Frame):
                                      fg="white",
                                      command=lambda: controller.mostrar_frame("TelaTerminal"))
         botao_terminal.pack(pady=10)
+
+        # Botão para ver o perfil do usuário
+        btn_perfil = tk.Button(self, 
+                               text="👤 Ver Perfil", 
+                               command=lambda: controller.mostrar_frame("TelaPerfil"))
+        btn_perfil.pack(pady=10)

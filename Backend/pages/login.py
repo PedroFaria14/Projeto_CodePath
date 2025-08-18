@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
-from google.cloud.firestore_v1.base_query import FieldFilter
+from google.api_core.exceptions import Forbidden
+from google.cloud.firestore_v1.base_query import FieldFilter # Importação necessária para a nova sintaxe
 
 class TelaLogin(tk.Frame):
     def __init__(self, parent, controller):
@@ -40,13 +41,20 @@ class TelaLogin(tk.Frame):
 
         try:
             users_ref = self.controller.db.collection('usuarios')
+            
+            # Sintaxe corrigida usando FieldFilter para evitar o aviso
             query = users_ref.where(filter=FieldFilter('email', '==', email)).where(filter=FieldFilter('senha', '==', senha)).limit(1).get()
 
             if len(query) > 0:
                 user_data = query[0].to_dict()
                 messagebox.showinfo("Login bem-sucedido", f"Bem-vindo, {user_data['nome']}!")
+                self.controller.logged_in_user = user_data
                 self.controller.mostrar_frame("TelaInicial")
             else:
                 messagebox.showerror("Erro", "Email ou senha incorretos.")
+        except Forbidden:
+            messagebox.showerror("Erro de Permissão", 
+                                 "Não foi possível verificar os dados. A API do Firestore pode estar desativada. "
+                                 "Por favor, ative-a no console do Google Cloud.")
         except Exception as e:
             messagebox.showerror("Erro", f"Ocorreu um erro ao verificar o login: {e}")
