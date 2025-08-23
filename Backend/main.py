@@ -2,13 +2,13 @@ import tkinter as tk
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# Importa as classes de tela de seus respectivos arquivos
+# Importa de telas
 from pages.login import TelaLogin
 from pages.register import TelaCadastro
 from pages.home import TelaInicial
 from pages.lesson import TelaLicao
 from pages.tela_terminal import TelaTerminal
-from pages.profile import TelaPerfil # Importa a TelaPerfil
+from pages.profile import TelaPerfil 
 
 class ProgrammingZooApp(tk.Tk):
     """
@@ -19,7 +19,7 @@ class ProgrammingZooApp(tk.Tk):
 
         self.title("Code Path")
         self.geometry("500x600")
-        self.logged_in_user = None # Armazena os dados do usuário logado
+        self.logged_in_user = None 
 
         # Inicializa o Firebase
         try:
@@ -38,14 +38,12 @@ class ProgrammingZooApp(tk.Tk):
 
         self.frames = {}
 
-        # Instancia as telas estáticas (sem a TelaPerfil, que é dinâmica)
         for F in (TelaLogin, TelaCadastro, TelaInicial, TelaTerminal):
             frame = F(container, self)
             self.frames[F.__name__] = frame
             frame.grid(row=0, column=0, sticky="nsew")
         
-        # A TelaPerfil não é criada aqui porque precisa dos dados do usuário
-        # Ela será criada no `mostrar_frame` quando o login for bem-sucedido
+      
         self.frames["TelaPerfil"] = None
 
         self.mostrar_frame("TelaLogin")
@@ -55,7 +53,6 @@ class ProgrammingZooApp(tk.Tk):
         Exibe a tela desejada, escondendo as outras.
         Cria uma nova instância de TelaLicao ou TelaPerfil se necessário.
         """
-        # A TelaLicao ainda é criada dinamicamente para carregar o conteúdo correto
         if nome_tela == "TelaLicao" and licao_selecionada:
             frame = TelaLicao(self.winfo_children()[0], self, licao_selecionada)
             self.frames[nome_tela] = frame

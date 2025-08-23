@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 from google.api_core.exceptions import Forbidden
+import datetime
 
 class TelaCadastro(tk.Frame):
     def __init__(self, parent, controller):
@@ -37,18 +38,18 @@ class TelaCadastro(tk.Frame):
             return
 
         try:
-            # Verifica se o email já está em uso
             users_ref = self.controller.db.collection('usuarios')
             query = users_ref.where('email', '==', email).limit(1).get()
             if len(query) > 0:
                 messagebox.showerror("Erro", "Este email já está cadastrado.")
                 return
 
-            # Adiciona o novo usuário
             users_ref.add({
                 "nome": nome,
                 "email": email,
-                "senha": senha
+                "senha": senha, 
+                "streak": 1,
+                "last_login": datetime.datetime.now() 
             })
 
             messagebox.showinfo("Sucesso", "Usuário cadastrado com sucesso!")

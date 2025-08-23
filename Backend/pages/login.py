@@ -1,7 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox
 from google.api_core.exceptions import Forbidden
-from google.cloud.firestore_v1.base_query import FieldFilter # Importação necessária para a nova sintaxe
+from google.cloud.firestore_v1.base_query import FieldFilter
+import datetime
 
 class TelaLogin(tk.Frame):
     def __init__(self, parent, controller):
@@ -26,7 +27,7 @@ class TelaLogin(tk.Frame):
 
     def verificar_login(self):
         """
-        Verifica as credenciais do usuário consultando o Firestore.
+        Verifica as credenciais do usuário e atualiza a contagem de ofensivas.
         """
         if not self.controller.db:
             messagebox.showerror("Erro de Banco de Dados", "Não foi possível conectar ao Firestore.")
@@ -41,12 +42,36 @@ class TelaLogin(tk.Frame):
 
         try:
             users_ref = self.controller.db.collection('usuarios')
-            
-            # Sintaxe corrigida usando FieldFilter para evitar o aviso
             query = users_ref.where(filter=FieldFilter('email', '==', email)).where(filter=FieldFilter('senha', '==', senha)).limit(1).get()
 
             if len(query) > 0:
-                user_data = query[0].to_dict()
+                user_doc = query[0]
+                user_data = user_doc.to_dict()
+                
+                # --- Lógica da Ofensiva ---
+                today = datetime.date.today()
+                
+                last_login = user_data.get('last_login')
+                current_streak = user_data.get('streak', 0)
+                
+                if last_login:
+                    last_login_date = last_login.date()
+                    
+                    if last_login_date == today - datetime.timedelta(days=1):
+                        current_streak += 1
+                    elif last_login_date == today:
+                        pass
+                    else:
+                        current_streak = 1
+                else:
+                    current_streak = 1
+
+                user_doc.reference.update({
+                    'streak': current_streak,
+                    'last_login': datetime.datetime.now() 
+                })
+                user_data['streak'] = current_streak
+
                 messagebox.showinfo("Login bem-sucedido", f"Bem-vindo, {user_data['nome']}!")
                 self.controller.logged_in_user = user_data
                 self.controller.mostrar_frame("TelaInicial")
