@@ -14,9 +14,6 @@ class TelaInicial extends StatelessWidget {
             end: Alignment.bottomCenter,
             colors: [Color(0xFFB2F7C1), Color(0xFFDFF5E1)],
           ),
-          // image: DecorationImage(
-          //   image: AssetImage("assets/imagens/fundo.jpg"),
-          //   fit: BoxFit.cover,
         ),
         child: Center(
           child: Padding(
@@ -47,23 +44,37 @@ class TelaInicial extends StatelessWidget {
 
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF3CB371),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF3CB371,
+                          ).withOpacity(0.7), // cor da sombra
+                          offset: const Offset(0, 6), // deslocamento da sombra
+                          blurRadius: 0, // sombra sem borrão, chapada
+                        ),
+                      ],
                     ),
-                    onPressed: () {
-                      /*navegar para outra tela*/
-                    },
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3CB371),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
 
-                    child: const Text(
-                      "COMEÇAR AGORA",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        elevation: 0,
+                      ),
+                      onPressed: () {},
+                      child: const Text(
+                        "COMEÇAR AGORA",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -73,26 +84,40 @@ class TelaInicial extends StatelessWidget {
 
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepPurple,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color.fromARGB(255, 107, 53, 199),
+                          offset: Offset(0, 6),
+                          blurRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromARGB(255, 63, 32, 117),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+
+                        elevation: 0,
                       ),
-                    ),
 
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => Login()),
-                    ),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => Login()),
+                      ),
 
-                    child: const Text(
-                      "Ir para Login",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white54,
+                      child: const Text(
+                        "Ir para Login",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
