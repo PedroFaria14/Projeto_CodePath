@@ -1,5 +1,4 @@
-# main.py
-# Este arquivo é o backend que vai se comunicar com seu aplicativo Flutter.
+
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -8,7 +7,6 @@ from pydantic import BaseModel, Field
 import datetime
 import os
 
-# Define a porta que a API vai usar. Por padrão, 8000.
 PORT = 8000
 
 # Inicializa o FastAPI
@@ -16,7 +14,6 @@ app = FastAPI(title="CodePath API", description="API para o aplicativo CodePath.
 
 # Inicializa o Firebase
 try:
-    # Tenta carregar a chave de serviço para se conectar ao Firebase
     cred = credentials.Certificate("firebase-service-account.json")
     firebase_admin.initialize_app(cred)
     db = firestore.client()
@@ -24,11 +21,10 @@ try:
 except Exception as e:
     print(f"Erro ao inicializar Firebase: {e}")
     db = None
-    # Em um ambiente de produção, seria melhor levantar uma exceção fatal
-    # para evitar que a API rode sem conexão com o banco.
+   
 
 # --- Modelos de Dados ---
-# Pydantic nos ajuda a validar os dados que chegam do Flutter
+
 class UserRegister(BaseModel):
     nome: str = Field(..., min_length=2)
     email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
@@ -64,7 +60,7 @@ async def register_user(user: UserRegister):
         user_data = {
             "nome": user.nome,
             "email": user.email,
-            "senha": user.senha, # Nota: Senhas deveriam ser criptografadas em um projeto real
+            "senha": user.senha, 
             "streak": 1,
             "last_login": datetime.datetime.now()
         }
@@ -106,15 +102,13 @@ async def login_user(user: UserLogin):
             else:
                 current_streak = 1
 
-            # Atualiza os dados do usuário no Firestore
+          
             user_doc.reference.update({
                 'streak': current_streak,
                 'last_login': datetime.datetime.now()
             })
             user_data['streak'] = current_streak
-            # --- Fim da Lógica da Ofensiva ---
-
-            # Remove a senha antes de retornar os dados
+           
             user_data.pop('senha', None)
             
             return {"success": True, "message": "Login bem-sucedido!", "user": user_data}
