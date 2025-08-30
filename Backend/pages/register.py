@@ -57,7 +57,6 @@ async def register_user(user: UserRegister):
 
     try:
         users_ref = db.collection('usuarios')
-        # Verifica se o email já está em uso
         query = users_ref.where(filter=FieldFilter('email', '==', user.email)).limit(1).get()
         if len(query) > 0:
             raise HTTPException(status_code=400, detail="Este email já está cadastrado.")
@@ -108,14 +107,12 @@ async def login_user(user: UserLogin):
             else:
                 current_streak = 1
 
-            # Atualiza os dados do usuário no Firestore
             user_doc.reference.update({
                 'streak': current_streak,
                 'last_login': datetime.datetime.now()
             })
             user_data['streak'] = current_streak
 
-            # Remove a senha antes de retornar os dados
             user_data.pop('senha', None)
             
             return {"success": True, "message": "Login bem-sucedido!", "user": user_data}
