@@ -51,6 +51,8 @@ class ApiService {
     }
   }
 
+  // teste
+
   // Método para registrar um novo usuário
   static Future<Map<String, dynamic>> registerUser(
     String nome,
