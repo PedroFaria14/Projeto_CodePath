@@ -1,11 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import '../api_service.dart';
+import 'package:http/http.dart' as http;
 import 'cadastro.dart';
-import 'pagina_Inicial.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});
-
   @override
   State<Login> createState() => _LoginState();
 }
@@ -18,31 +18,44 @@ class _LoginState extends State<Login> {
   Future<void> loginUser() async {
     setState(() => isLoading = true);
 
-    final result = await ApiService.loginUser(
-      emailController.text.trim(),
-      senhaController.text.trim(),
-    );
-
-    if (result['success'] == true) {
-      // Sucesso no login
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Login realizado com sucesso!")),
+    try {
+      final url = Uri.parse(
+        "http://10.0.2.2:8000/login",
+      ); // emulador para o AndroidStudio -- verificarei, posteriormente, como ficará para aparelhos fisícos
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": emailController.text.trim(),
+          "senha": senhaController.text.trim(),
+        }),
       );
 
-      // Agora, o aplicativo navega para a tela principal
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const TelaInicial()),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result['message'] ?? "Erro no login. Email ou senha incorretos!",
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data["success"] == true) {
+        // Sucesso no login
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Login realizado com sucesso!")),
+        );
+
+        // Aqui você pode navegar para a tela principal
+        // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomePage()));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              data["message"] ?? "Erro no login. Email ou senha incorretos!",
+            ),
           ),
-        ),
-      );
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Erro de conexão: $e")));
     }
+
     setState(() => isLoading = false);
   }
 
@@ -70,6 +83,7 @@ class _LoginState extends State<Login> {
                 "BEM VINDO DE VOLTA",
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
+
               const SizedBox(height: 30),
               TextField(
                 controller: emailController,
@@ -91,6 +105,7 @@ class _LoginState extends State<Login> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 30),
               ElevatedButton(
                 onPressed: isLoading ? null : loginUser,
@@ -104,7 +119,9 @@ class _LoginState extends State<Login> {
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text("Entrar"),
               ),
+
               const SizedBox(height: 15),
+
               TextButton(
                 onPressed: () => Navigator.push(
                   context,
