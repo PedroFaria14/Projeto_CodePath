@@ -35,7 +35,7 @@ async def register_user(user: UserRegister):
             "idade": user.idade,
             "streak": 1,
             "last_login": datetime.datetime.now(),
-            "level": "iniciante"
+            "nivel": "iniciante"
         }
         users_ref.add(user_data)
         return {"success": True, "message": "Usuário cadastrado com sucesso!"}

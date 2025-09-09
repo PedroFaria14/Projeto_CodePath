@@ -3,40 +3,47 @@ import random
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from main import db  
+from utils import get_num_questions_by_level  # importa a função auxiliar
+from models import ApiResponse  # importa o response model (ou define aqui)
+from data.lessons import licoes  # importa as perguntas
 
 router = APIRouter()
 
-class GetQuestions(BaseModel):
+# Modelo de entrada
+class GetQuestionsByType(BaseModel):
     user_level: str
+    question_type: str
 
-@router.post("/get_questions")
-async def get_questions(request_data: GetQuestions):
+@router.post("/get_questions_by_type", response_model=ApiResponse)
+async def get_questions_by_type(request_data: GetQuestionsByType):
     if not db:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco de dados.")
 
     try:
-        perguntas_ref = db.collection('perguntas')
-        query = perguntas_ref.where('nivel', '==', request_data.user_level).get()
+        filtered_questions = [
+            q for q in licoes.values()
+            if q['nivel'].lower() == request_data.nivel.lower() and q['tipo'].lower() == request_data.question_type.lower()
+        ]
         
-        if not query:
-            raise HTTPException(status_code=404, detail="Nenhuma pergunta encontrada para este nível.")
-            
-        perguntas = [doc.to_dict() for doc in query]
-        random.shuffle(perguntas)
-
-        # Quantidade de perguntas por nível
-        if request_data.user_level == "Dificil":
-            num_questions = 10
-        elif request_data.user_level == "Medio":
-            num_questions = 12
-        elif request_data.user_level == "Iniciante":
-            num_questions = 15
-        else:
-            num_questions = 10
-
-        perguntas_selecionadas = perguntas[:num_questions]
+        if not filtered_questions:
+            raise HTTPException(
+                status_code=404, 
+                detail="Nenhuma pergunta encontrada para este nível e tipo."
+            )
         
-        return {"success": True, "questions": perguntas_selecionadas}
+        random.shuffle(filtered_questions)
+
+        # usa a função auxiliar para decidir a quantidade
+        num_questions = get_num_questions_by_level(request_data.user_level)
+        
+        perguntas_selecionadas = filtered_questions[:num_questions]
+        
+        return {
+            "success": True,
+            "questions": perguntas_selecionadas,
+            "total_questions": num_questions,
+            "level": request_data.user_level
+        }
         
     except Exception as e:
         print(f"Erro ao buscar perguntas: {e}")
