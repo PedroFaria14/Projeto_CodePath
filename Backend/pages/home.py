@@ -1,38 +1,40 @@
-import tkinter as tk
-from data.lessons import licoes
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+import datetime
+from firebase import db
+from google.cloud.firestore_v1.base_query import FieldFilter
 
-class TelaInicial(tk.Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent)
-        self.controller = controller
+router = APIRouter()
 
-        # Layout da tela inicial
-        label = tk.Label(self, text="Escolha sua atividade!", font=("Arial", 20, "bold"))
-        label.pack(pady=20, padx=10)
 
-        for nome_licao in licoes:
-            animal_emoji = licoes[nome_licao]["animal"].split(" ")[0]
-            botao_licao = tk.Button(self,
-                                     text=f"{animal_emoji} {nome_licao}",
-                                     font=("Arial", 14),
-                                     width=25,
-                                     command=lambda l=nome_licao: controller.mostrar_frame("TelaLicao", l))
-            botao_licao.pack(pady=10)
+class ApiResponse(BaseModel):
+    success: bool
+    message: str
+    user: dict | None = None
+    questions: list | None = None
 
-        label_desafio = tk.Label(self, text="--- Faça Você Mesmo ---", font=("Arial", 12, "italic"))
-        label_desafio.pack(pady=(20, 5))
 
-        botao_terminal = tk.Button(self,
-                                     text="🐍 Terminal Python",
-                                     font=("Arial", 14, "bold"),
-                                     width=25,
-                                     bg="#306998",
-                                     fg="white",
-                                     command=lambda: controller.mostrar_frame("TelaTerminal"))
-        botao_terminal.pack(pady=10)
+@router.get("/profile/{user_email}", response_model=ApiResponse)
+async def get_user_profile(user_email: str):
+    if not db:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco de dados.")
 
-        # Botão para ver o perfil do usuário
-        btn_perfil = tk.Button(self, 
-                               text="👤 Ver Perfil", 
-                               command=lambda: controller.mostrar_frame("TelaPerfil"))
-        btn_perfil.pack(pady=10)
+    try:
+        users_ref = db.collection('usuarios')
+        query = users_ref.where(filter=FieldFilter('email', '==', user_email)).limit(1).get()
+
+        if len(query) == 0:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+
+        user_doc = query[0]
+        user_data = user_doc.to_dict()
+        user_data.pop('senha', None)  # remove a senha antes de enviar
+
+        return ApiResponse(
+            success=True,
+            message="Perfil encontrado.",
+            user=user_data
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ocorreu um erro ao buscar o perfil do usuário: {e}")

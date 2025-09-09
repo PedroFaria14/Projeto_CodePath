@@ -1,38 +1,32 @@
-import tkinter as tk
-from tkinter import messagebox
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from firebase import db
 
-class TelaPerfil(tk.Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent)
-        self.controller = controller
-        
-        self.user_data = self.controller.logged_in_user
+router = APIRouter()
 
-        # Layout da tela de perfil
-        tk.Label(self, text="Perfil do Usuário", font=("Arial", 20, "bold")).pack(pady=20)
+# Modelo de resposta
+class ApiResponse(BaseModel):
+    success: bool
+    message: str
+    user: dict = None
 
-        if self.user_data:
-            nome = self.user_data.get("nome", "Usuário")
-            email = self.user_data.get("email", "")
-            streak = self.user_data.get("streak", 0)
-            
-            tk.Label(self, text=f"Olá, {nome}!", font=("Arial", 16)).pack(pady=10)
-            tk.Label(self, text=f"Email: {email}", font=("Arial", 12)).pack(pady=5)
-            tk.Label(self, text=f"🔥 Ofensivas: {streak} dias", font=("Arial", 14, "bold")).pack(pady=10)
-        else:
-            tk.Label(self, text="Nenhum usuário logado.", font=("Arial", 16)).pack(pady=10)
-            
-        tk.Button(self, text="Ir para o Menu Principal", 
-                  font=("Arial", 12, "bold"), 
-                  bg="#4CAF50", 
-                  fg="white",
-                  command=lambda: controller.mostrar_frame("TelaInicial")).pack(pady=20)
+@router.get("/profile/{user_email}", response_model=ApiResponse)
+async def get_user_profile(user_email: str):
+    if not db:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco de dados.")
 
-        tk.Button(self, text="Sair", 
-                  font=("Arial", 10),
-                  command=self.voltar_para_login).pack(pady=5)
+    try:
+        users_ref = db.collection('usuarios')
+        query = users_ref.where('email', '==', user_email).limit(1).get()
 
-    def voltar_para_login(self):
-        self.controller.logged_in_user = None
-        if messagebox.askyesno("Sair", "Tem certeza que deseja sair?"):
-            self.controller.mostrar_frame("TelaLogin")
+        if len(query) == 0:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+
+        user_doc = query[0]
+        user_data = user_doc.to_dict()
+        user_data.pop('senha', None)  
+
+        return {"success": True, "message": "Perfil encontrado.", "user": user_data}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ocorreu um erro ao buscar o perfil do usuário: {e}")

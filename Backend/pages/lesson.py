@@ -1,43 +1,43 @@
-import tkinter as tk
-from tkinter import messagebox
-from data.lessons import licoes
-class TelaLicao(tk.Frame):
-    def __init__(self, parent, controller, nome_licao):
-        super().__init__(parent)
-        self.controller = controller
-        self.dados_licao = licoes[nome_licao]
+# leasson.py
+import random
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from main import db  
 
-        # Layout da tela da lição
-        label_animal = tk.Label(self, text=self.dados_licao["animal"], font=("Arial", 24, "bold"))
-        label_animal.pack(pady=10)
+router = APIRouter()
 
-        label_explicacao = tk.Label(self, text=self.dados_licao["explicacao"], wraplength=350, justify="center")
-        label_explicacao.pack(pady=10, padx=20)
+class GetQuestions(BaseModel):
+    user_level: str
 
-        label_pergunta = tk.Label(self, text=self.dados_licao["pergunta"], font=("Arial", 12, "italic"), wraplength=350)
-        label_pergunta.pack(pady=20)
+@router.post("/get_questions")
+async def get_questions(request_data: GetQuestions):
+    if not db:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco de dados.")
 
-        self.resposta_usuario = tk.StringVar()
+    try:
+        perguntas_ref = db.collection('perguntas')
+        query = perguntas_ref.where('nivel', '==', request_data.user_level).get()
+        
+        if not query:
+            raise HTTPException(status_code=404, detail="Nenhuma pergunta encontrada para este nível.")
+            
+        perguntas = [doc.to_dict() for doc in query]
+        random.shuffle(perguntas)
 
-        for opcao in self.dados_licao["opcoes"]:
-            rb = tk.Radiobutton(self, text=opcao, variable=self.resposta_usuario, value=opcao, font=("Arial", 12))
-            rb.pack(anchor="w", padx=50)
-
-        btn_verificar = tk.Button(self, text="Verificar", font=("Arial", 14, "bold"), bg="#4CAF50", fg="white",
-                                   command=self.verificar_resposta)
-        btn_verificar.pack(pady=20)
-
-        btn_voltar = tk.Button(self, text="Voltar ao Menu", command=lambda: controller.mostrar_frame("TelaInicial"))
-        btn_voltar.pack(pady=5)
-
-    def verificar_resposta(self):
-        """
-        Verifica se a resposta selecionada está correta e exibe um feedback.
-        """
-        selecionada = self.resposta_usuario.get()
-        correta = self.dados_licao["resposta_correta"]
-
-        if selecionada == correta:
-            messagebox.showinfo("Correto!", "Parabéns, você acertou! 🦜")
+        # Quantidade de perguntas por nível
+        if request_data.user_level == "Dificil":
+            num_questions = 10
+        elif request_data.user_level == "Medio":
+            num_questions = 12
+        elif request_data.user_level == "Iniciante":
+            num_questions = 15
         else:
-            messagebox.showerror("Incorreto!", f"Ops, não foi dessa vez. A resposta certa é '{correta}'. Tente de novo!")
+            num_questions = 10
+
+        perguntas_selecionadas = perguntas[:num_questions]
+        
+        return {"success": True, "questions": perguntas_selecionadas}
+        
+    except Exception as e:
+        print(f"Erro ao buscar perguntas: {e}")
+        raise HTTPException(status_code=500, detail="Ocorreu um erro no servidor.")

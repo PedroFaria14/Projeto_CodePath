@@ -1,12 +1,19 @@
-
-
 import firebase_admin
 from firebase_admin import credentials, firestore
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 import datetime
 import os
+from google.cloud.firestore_v1.base_query import FieldFilter
 
+# Endpoints
+from leasson import router as leasson_router
+from auth import router as auth_router
+from login import router as login_router
+from profile import router as profile_router
+from home import router as home_router
+from update_nivel import router as update_nivel_router
+  
 PORT = 8000
 
 # Inicializa o FastAPI
@@ -21,100 +28,16 @@ try:
 except Exception as e:
     print(f"Erro ao inicializar Firebase: {e}")
     db = None
-   
 
-# --- Modelos de Dados ---
 
-class UserRegister(BaseModel):
-    nome: str = Field(..., min_length=2)
-    email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
-    senha: str = Field(..., min_length=6)
 
-class UserLogin(BaseModel):
-    email: str
-    senha: str
-
-class ApiResponse(BaseModel):
-    success: bool
-    message: str
-    user: dict = None
 
 # --- Endpoints da API ---
 
-@app.post("/register", response_model=ApiResponse)
-async def register_user(user: UserRegister):
-    """
-    Endpoint para registrar um novo usuário no Firestore.
-    """
-    if not db:
-        raise HTTPException(status_code=500, detail="Erro de conexão com o banco de dados.")
+app.include_router(auth_router)
+app.include_router(login_router)
+app.include_router(update_nivel_router)
+app.include_router(home_router)
+app.include_router(leasson_router)
+app.include_router(profile_router)
 
-    try:
-        users_ref = db.collection('usuarios')
-        # Verifica se o email já está em uso
-        query = users_ref.where('email', '==', user.email).limit(1).get()
-        if len(query) > 0:
-            raise HTTPException(status_code=400, detail="Este email já está cadastrado.")
-
-        # Adiciona o novo usuário com a ofensiva inicial
-        user_data = {
-            "nome": user.nome,
-            "email": user.email,
-            "senha": user.senha, 
-            "streak": 1,
-            "last_login": datetime.datetime.now()
-        }
-        users_ref.add(user_data)
-        
-        return {"success": True, "message": "Usuário cadastrado com sucesso!"}
-    
-    except Exception as e:
-        print(f"Erro ao registrar o usuário: {e}")
-        raise HTTPException(status_code=500, detail="Ocorreu um erro no servidor.")
-
-@app.post("/login", response_model=ApiResponse)
-async def login_user(user: UserLogin):
-    """
-    Endpoint para login de usuário e atualização da contagem de ofensivas.
-    """
-    if not db:
-        raise HTTPException(status_code=500, detail="Erro de conexão com o banco de dados.")
-
-    try:
-        users_ref = db.collection('usuarios')
-        query = users_ref.where('email', '==', user.email).where('senha', '==', user.senha).limit(1).get()
-
-        if len(query) > 0:
-            user_doc = query[0]
-            user_data = user_doc.to_dict()
-
-            # --- Lógica da Ofensiva ---
-            today = datetime.date.today()
-            last_login = user_data.get('last_login')
-            current_streak = user_data.get('streak', 0)
-            
-            if last_login:
-                last_login_date = last_login.date()
-                if last_login_date == today - datetime.timedelta(days=1):
-                    current_streak += 1
-                elif last_login_date != today:
-                    current_streak = 1
-            else:
-                current_streak = 1
-
-          
-            user_doc.reference.update({
-                'streak': current_streak,
-                'last_login': datetime.datetime.now()
-            })
-            user_data['streak'] = current_streak
-           
-            user_data.pop('senha', None)
-            
-            return {"success": True, "message": "Login bem-sucedido!", "user": user_data}
-        else:
-            raise HTTPException(status_code=401, detail="Email ou senha incorretos.")
-
-    except Exception as e:
-        print(f"Erro ao verificar o login: {e}")
-        raise HTTPException(status_code=500, detail="Ocorreu um erro no servidor.")
