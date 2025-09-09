@@ -8,7 +8,7 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 
 # Endpoints
 from leasson import router as leasson_router
-from auth import router as auth_router
+from auth import router as register_router
 from login import router as login_router
 from profile import router as profile_router
 from home import router as home_router
@@ -34,7 +34,7 @@ except Exception as e:
 
 # --- Endpoints da API ---
 
-app.include_router(auth_router)
+app.include_router(register_router)
 app.include_router(login_router)
 app.include_router(update_nivel_router)
 app.include_router(home_router)
