@@ -11,20 +11,23 @@ questions_data = [
     
     {
         "nivel": "Dificil",
+         "idPergunta": "3000",
         "tipo": "Laços de Repetição",
         "pergunta": "O que é um 'Decorator' em Python?",
         "opcoes": ["Uma função que envolve outra função", "Uma classe que decora a interface", "Uma ferramenta de depuração", "Um tipo de erro"],
         "resposta_correta": "Uma função que envolve outra função"
     },
     {
-        "nivel": "Médio",
+        "nivel": "Medio",
+         "idPergunta": "2000",
         "tipo": "Condicionais",
         "pergunta": "O que faz a instrução 'else' em uma condicional?",
         "opcoes": ["Executa um bloco de código se a condição for falsa", "Inicia um loop", "Define uma variável", "Chama uma função"],
         "resposta_correta": "Executa um bloco de código se a condição for falsa"
     },
     {
-        "nivel": "Iniciante",
+        "nivel": "Facil",
+         "idPergunta": "1000",
         "tipo": "Perguntas diversas",
         "pergunta": "Qual das seguintes opções é uma variável em python?",
         "opcoes": ["'if'", "10", "'hello world'", "def"],
