@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 import datetime
-from firebase import db
-
+from fastapi import APIRouter
+from firebase_config import db
 router = APIRouter()
 
 # Modelo de dados para registro

@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from firebase import db
-
+from firebase_config import db
 router = APIRouter()
 
 # Modelo de resposta

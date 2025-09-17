@@ -1,8 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import datetime
-from firebase import db
-
+from firebase_config import db
 router = APIRouter()
 
 # Modelo de dados para login

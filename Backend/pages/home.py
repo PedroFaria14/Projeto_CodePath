@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import datetime
-from firebase import db
+from firebase_config import db
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 router = APIRouter()
