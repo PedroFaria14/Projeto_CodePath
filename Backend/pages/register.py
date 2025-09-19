@@ -17,6 +17,14 @@ class ApiResponse(BaseModel):
     success: bool
     message: str
 
+INITIAL_FASES = [
+    {"id": 1, "liberada": True, "atual": True},
+    {"id": 2, "liberada": False, "atual": False},
+    {"id": 3, "liberada": False, "atual": False},
+    {"id": 4, "liberada": False, "atual": False},
+    {"id": 5, "liberada": False, "atual": False}
+]
+
 @router.post("/register", response_model=ApiResponse)
 async def register_user(user: UserRegister):
     if not db:
@@ -35,7 +43,8 @@ async def register_user(user: UserRegister):
             "idade": user.idade,
             "streak": 1,
             "last_login": datetime.datetime.now(),
-            "nivel": "iniciante"
+            "nivel": "iniciante",
+            "fases": INITIAL_FASES
         }
         users_ref.add(user_data)
         return {"success": True, "message": "Usuário cadastrado com sucesso!"}

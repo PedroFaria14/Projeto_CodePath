@@ -13,6 +13,7 @@ from pages.profile import router as profile_router
 from pages.home import router as home_router
 from pages.update_nivel import router as update_nivel_router
 from pages.leasson import router as leasson_router
+from pages.progress import router as progress
   
 PORT = 8000
 
@@ -40,4 +41,6 @@ app.include_router(update_nivel_router)
 app.include_router(home_router)
 app.include_router(leasson_router)
 app.include_router(profile_router)
+app.include_router(progress)
+
 

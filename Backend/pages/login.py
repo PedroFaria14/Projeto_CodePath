@@ -15,6 +15,14 @@ class ApiResponse(BaseModel):
     message: str
     user: dict = None
 
+INITIAL_FASES = [
+ {"id": 1, "liberada": True, "atual": True},
+{"id": 2, "liberada": False, "atual": False},
+ {"id": 3, "liberada": False, "atual": False},
+{"id": 4, "liberada": False, "atual": False},
+ {"id": 5, "liberada": False, "atual": False}
+]
+
 @router.post("/login", response_model=ApiResponse)
 async def login_user(user: UserLogin):
     if not db:
@@ -47,6 +55,11 @@ async def login_user(user: UserLogin):
                 streak = 1
         else:
             streak = 1
+            
+        
+        if 'fases' not in user_data:
+            user_doc.reference.update({'fases': INITIAL_FASES})
+            user_data['fases'] = INITIAL_FASES
 
         # Atualiza Firestore
         user_doc.reference.update({
