@@ -64,7 +64,10 @@ class TelaInicial extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
+<<<<<<< HEAD
 
+=======
+>>>>>>> Integracao
                         elevation: 0,
                       ),
                       onPressed: () {},
@@ -102,7 +105,10 @@ class TelaInicial extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
+<<<<<<< HEAD
 
+=======
+>>>>>>> Integracao
                         elevation: 0,
                       ),
 
@@ -110,7 +116,10 @@ class TelaInicial extends StatelessWidget {
                         context,
                         MaterialPageRoute(builder: (context) => Login()),
                       ),
+<<<<<<< HEAD
 
+=======
+>>>>>>> Integracao
                       child: const Text(
                         "Ir para Login",
                         style: TextStyle(

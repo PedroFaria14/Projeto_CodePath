@@ -1,74 +1,46 @@
-import tkinter as tk
 import firebase_admin
 from firebase_admin import credentials, firestore
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+import datetime
+import os
+from google.cloud.firestore_v1.base_query import FieldFilter
+from firebase_config import db
+# Endpoints
+from pages.register import router as register_router
+from pages.login import router as login_router
+from pages.profile import router as profile_router
+from pages.home import router as home_router
+from pages.update_nivel import router as update_nivel_router
+from pages.leasson import router as leasson_router
+from pages.progress import router as progress
+  
+PORT = 8000
 
-# Importa de telas
-from pages.login import TelaLogin
-from pages.register import TelaCadastro
-from pages.home import TelaInicial
-from pages.lesson import TelaLicao
-from pages.tela_terminal import TelaTerminal
-from pages.profile import TelaPerfil 
+# Inicializa o FastAPI
+app = FastAPI(title="CodePath API", description="API para o aplicativo CodePath.")
 
-class ProgrammingZooApp(tk.Tk):
-    """
-    Controlador principal da aplicação. Gerencia a navegação entre as telas.
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.title("Code Path")
-        self.geometry("500x600")
-        self.logged_in_user = None 
-
-        # Inicializa o Firebase
-        try:
-            cred = credentials.Certificate("firebase-service-account.json")
-            firebase_admin.initialize_app(cred)
-            self.db = firestore.client()
-            print("Conexão com Firestore estabelecida com sucesso!")
-        except Exception as e:
-            print(f"Erro ao inicializar Firebase: {e}")
-            self.db = None
-
-        container = tk.Frame(self)
-        container.pack(side="top", fill="both", expand=True)
-        container.grid_rowconfigure(0, weight=1)
-        container.grid_columnconfigure(0, weight=1)
-
-        self.frames = {}
-
-        for F in (TelaLogin, TelaCadastro, TelaInicial, TelaTerminal):
-            frame = F(container, self)
-            self.frames[F.__name__] = frame
-            frame.grid(row=0, column=0, sticky="nsew")
-        
-      
-        self.frames["TelaPerfil"] = None
-
-        self.mostrar_frame("TelaLogin")
-
-    def mostrar_frame(self, nome_tela, licao_selecionada=None):
-        """
-        Exibe a tela desejada, escondendo as outras.
-        Cria uma nova instância de TelaLicao ou TelaPerfil se necessário.
-        """
-        if nome_tela == "TelaLicao" and licao_selecionada:
-            frame = TelaLicao(self.winfo_children()[0], self, licao_selecionada)
-            self.frames[nome_tela] = frame
-            frame.grid(row=0, column=0, sticky="nsew")
-        elif nome_tela == "TelaPerfil":
-             # Se a TelaPerfil não foi criada, cria ela agora
-             if self.frames["TelaPerfil"] is None:
-                 frame = TelaPerfil(self.winfo_children()[0], self)
-                 self.frames["TelaPerfil"] = frame
-                 frame.grid(row=0, column=0, sticky="nsew")
-        
-        frame = self.frames[nome_tela]
-        frame.tkraise()
-        frame.focus_set()
+# # Inicializa o Firebase
+# try:
+#     cred = credentials.Certificate("firebase-service-account.json")
+#     firebase_admin.initialize_app(cred)
+#     db = firestore.client()
+#     print("Conexão com Firestore estabelecida com sucesso!")
+# except Exception as e:
+#     print(f"Erro ao inicializar Firebase: {e}")
+#     db = None
 
 
-if __name__ == "__main__":
-    app = ProgrammingZooApp()
-    app.mainloop()
+
+
+# --- Endpoints da API ---
+
+app.include_router(register_router)
+app.include_router(login_router)
+app.include_router(update_nivel_router)
+app.include_router(home_router)
+app.include_router(leasson_router)
+app.include_router(profile_router)
+app.include_router(progress)
+
+
