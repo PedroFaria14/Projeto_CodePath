@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'login.dart';
+import 'trilhaUm.dart';
 
 class TelaInicial extends StatelessWidget {
   const TelaInicial({super.key});
@@ -12,7 +13,8 @@ class TelaInicial extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFFB2F7C1), Color(0xFFDFF5E1)],
+            stops: [0.1, 0.6, 1.0],
+            colors: [Color(0xFFE0F8E0), Color(0xFFB2F7C1), Color(0xFF90EE90)],
           ),
         ),
         child: Center(
@@ -49,11 +51,9 @@ class TelaInicial extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(
-                            0xFF3CB371,
-                          ).withOpacity(0.7), // cor da sombra
-                          offset: const Offset(0, 6), // deslocamento da sombra
-                          blurRadius: 0, // sombra sem borrão, chapada
+                          color: const Color(0xFF3CB371).withOpacity(0.7),
+                          offset: const Offset(0, 6),
+                          blurRadius: 0,
                         ),
                       ],
                     ),
@@ -64,13 +64,18 @@ class TelaInicial extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-<<<<<<< HEAD
 
-=======
->>>>>>> Integracao
                         elevation: 0,
                       ),
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ModuloPage(),
+                          ),
+                        );
+                      },
+
                       child: const Text(
                         "COMEÇAR AGORA",
                         style: TextStyle(
@@ -92,7 +97,7 @@ class TelaInicial extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color.fromARGB(255, 107, 53, 199),
+                          color: const Color.fromARGB(255, 81, 46, 143),
                           offset: Offset(0, 6),
                           blurRadius: 0,
                         ),
@@ -105,10 +110,7 @@ class TelaInicial extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-<<<<<<< HEAD
 
-=======
->>>>>>> Integracao
                         elevation: 0,
                       ),
 
@@ -116,10 +118,7 @@ class TelaInicial extends StatelessWidget {
                         context,
                         MaterialPageRoute(builder: (context) => Login()),
                       ),
-<<<<<<< HEAD
 
-=======
->>>>>>> Integracao
                       child: const Text(
                         "Ir para Login",
                         style: TextStyle(
