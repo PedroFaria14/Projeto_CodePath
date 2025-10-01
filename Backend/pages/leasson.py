@@ -55,28 +55,32 @@ async def get_persona_by_tipo(tipo_exercicio: str):
 @router.post("/responder", response_model=ApiResponse)
 async def responder(resposta: RespostaUsuario):
     try:
-        # 1. Busca a pergunta no Firebase
-        doc = db.collection("perguntas").document(resposta.idPergunta).get()
-        if not doc.exists:
+        # 1. Busca a pergunta pelo campo idPergunta (não pelo doc.id)
+        docs = db.collection("perguntas").where("idPergunta", "==", resposta.idPergunta).limit(1).stream()
+        doc = next(docs, None)
+
+        if not doc:
             raise HTTPException(status_code=404, detail="Pergunta não encontrada")
 
         pergunta = doc.to_dict()
         correta = pergunta["resposta_correta"]
-        
-        # 2. Busca a persona com base no tipo da pergunta
-        tipo_exercicio = pergunta.get("tipo", None)
-        if not tipo_exercicio:
-            prompts_persona = await get_persona_by_tipo("Laços de Repetição")
-        else:
-            prompts_persona = await get_persona_by_tipo(tipo_exercicio)
 
-        # 3. Verifica se a resposta está correta e gera a explicação
-        if resposta.resposta == correta:
-            explicacao = gerar_explicacao(pergunta["pergunta"], correta, resposta.resposta, acertou=True, prompts_persona=prompts_persona)
-            return ApiResponse(success=True, message="Resposta correta 🎉", explicacao=explicacao)
-        else:
-            explicacao = gerar_explicacao(pergunta["pergunta"], correta, resposta.resposta, acertou=False, prompts_persona=prompts_persona)
-            return ApiResponse(success=False, message="Resposta incorreta ❌", explicacao=explicacao)
+        # 2. Busca persona
+        tipo_exercicio = pergunta.get("tipo") or "Laços de Repetição"
+        prompts_persona = await get_persona_by_tipo(tipo_exercicio)
+
+        # 3. Valida resposta
+        acertou = resposta.resposta == correta
+        explicacao = gerar_explicacao(
+            pergunta["pergunta"], correta, resposta.resposta,
+            acertou=acertou, prompts_persona=prompts_persona
+        )
+
+        return ApiResponse(
+            success=acertou,
+            message="Resposta correta 🎉" if acertou else "Resposta incorreta ❌",
+            explicacao=explicacao
+        )
 
     except HTTPException as e:
         raise e

@@ -26,6 +26,8 @@ def gerar_explicacao(pergunta: str, resposta_correta: str, resposta_usuario: str
     """
     
     # 3. Faz a chamada ao Gemini
-    model = genai.GenerativeModel("gemini-pro")
+    # model = genai.GenerativeModel("gemini-pro")
+    model = genai.GenerativeModel("gemini-2.5-flash")
+
     response = model.generate_content(prompt)
     return response.text
