@@ -15,7 +15,7 @@ class UpdateUserLevel(BaseModel):
 class ApiResponse(BaseModel):
     success: bool
     message: str
-    user: Optional[dict] = None
+    
 
 
 @router.post("/update_nivel", response_model=ApiResponse)

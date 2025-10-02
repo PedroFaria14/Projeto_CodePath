@@ -23,9 +23,15 @@ class ApiResponse(BaseModel):
     message: str
     pergunta: dict | None = None
     explicacao: str | None = None
+    
+class ApiResponseQuestions(BaseModel):
+    success: bool
+    message: str
+    pergunta: dict | None = None
+    
 
 #buscar pergunta aleatória por nível
-@router.get("/pergunta/{nivel}", response_model=ApiResponse)
+@router.get("/pergunta/{nivel}", response_model=ApiResponseQuestions)
 async def get_pergunta(nivel: str):
     try:
         perguntas_ref = db.collection("perguntas").where("nivel", "==", nivel)
@@ -66,7 +72,7 @@ async def responder(resposta: RespostaUsuario):
         correta = pergunta["resposta_correta"]
 
         # 2. Busca persona
-        tipo_exercicio = pergunta.get("tipo") or "Laços de Repetição"
+        tipo_exercicio = pergunta.get("tipo")
         prompts_persona = await get_persona_by_tipo(tipo_exercicio)
 
         # 3. Valida resposta
@@ -75,6 +81,8 @@ async def responder(resposta: RespostaUsuario):
             pergunta["pergunta"], correta, resposta.resposta,
             acertou=acertou, prompts_persona=prompts_persona
         )
+        
+        explicacao = explicacao.replace('\n', ' ').strip()
 
         return ApiResponse(
             success=acertou,
