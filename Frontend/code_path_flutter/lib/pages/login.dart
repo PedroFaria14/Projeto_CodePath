@@ -20,12 +20,7 @@ class _LoginState extends State<Login> {
     setState(() => isLoading = true);
 
     try {
-      final url = Uri.parse(
-        "http://10.0.2.2:8000/login",
-      ); // emulador AndroidStudio - quando testar em aparelho fisico, trocar
-      final url = Uri.parse(
-        "http://10.0.2.2:8000/login",
-      ); // emulador AndroidStudio - quando testar em aparelho fisico, trocar
+      final url = Uri.parse("http://10.0.2.2:8000/login"); // emulador Android
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
@@ -109,7 +104,7 @@ class _LoginState extends State<Login> {
                   controller: emailController,
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: const Color(0xFF262840),
+                    fillColor: const Color(0xFF262840), // cor do fundo
                     hintText: 'E-mail',
                     hintStyle: const TextStyle(color: Colors.white70),
                     contentPadding: const EdgeInsets.symmetric(
@@ -133,7 +128,7 @@ class _LoginState extends State<Login> {
                   controller: emailController,
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: const Color(0xFF262840),
+                    fillColor: const Color(0xFF262840), // cor do fundo
                     hintText: 'Senha',
                     hintStyle: const TextStyle(color: Colors.white70),
                     contentPadding: const EdgeInsets.symmetric(

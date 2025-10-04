@@ -1,4 +1,4 @@
-# code_path_flutter
+# codepath
 
 A new Flutter project.
 

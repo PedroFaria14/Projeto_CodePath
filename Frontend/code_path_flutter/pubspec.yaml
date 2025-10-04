@@ -1,4 +1,4 @@
-name: code_path_flutter
+name: codepath
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -30,7 +30,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
   http: ^1.2.2
 
   # The following adds the Cupertino Icons font to your application.
@@ -89,5 +88,6 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
   assets:
     - assets/imagens/

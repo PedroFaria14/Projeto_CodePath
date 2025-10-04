@@ -23,9 +23,9 @@ class _QuestaoPageState extends State<QuestaoPage> {
     carregarQuestao();
   }
 
-  // 🔹 BD?
+  // 🔹 Simulação de banco de dados local
   Future<void> carregarQuestao() async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 500)); // simula atraso
 
     final questoes = {
       1: {
@@ -71,7 +71,9 @@ class _QuestaoPageState extends State<QuestaoPage> {
       ),
     );
 
-    if (correta) {}
+    if (correta) {
+      // Aqui depois você chama o backend para atualizar progresso
+    }
   }
 
   @override

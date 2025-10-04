@@ -134,7 +134,9 @@ class PaginaHome extends StatelessWidget {
         title: Text(title),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.arrow_forward_ios, size: 18),
-        onTap: () {},
+        onTap: () {
+          // Ação ao clicar no curso
+        },
       ),
     );
   }

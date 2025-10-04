@@ -1,4 +1,4 @@
-import 'login.dart';
+import 'package:codepath/pages/login.dart';
 import 'package:flutter/material.dart';
 
 class Cadastro extends StatelessWidget {
@@ -17,6 +17,7 @@ class Cadastro extends StatelessWidget {
             stops: [0.2, 0.6, 1.0],
           ),
         ),
+
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -33,6 +34,7 @@ class Cadastro extends StatelessWidget {
                     "Crie sua conta",
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
+
                   const SizedBox(height: 30),
                   TextField(
                     style: const TextStyle(color: Colors.white),
@@ -47,6 +49,7 @@ class Cadastro extends StatelessWidget {
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 30),
                   TextField(
                     style: const TextStyle(color: Colors.white),
@@ -61,6 +64,7 @@ class Cadastro extends StatelessWidget {
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 30),
                   TextField(
                     style: const TextStyle(color: Colors.white),
@@ -89,6 +93,7 @@ class Cadastro extends StatelessWidget {
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 30),
                   TextField(
                     style: const TextStyle(color: Colors.white),
@@ -103,6 +108,7 @@ class Cadastro extends StatelessWidget {
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 30),
                   ElevatedButton(
                     onPressed: () {},
@@ -121,7 +127,9 @@ class Cadastro extends StatelessWidget {
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 15),
+
                   TextButton(
                     onPressed: () => Navigator.push(
                       context,

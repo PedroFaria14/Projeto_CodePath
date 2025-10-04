@@ -1,6 +1,6 @@
 {
-    "name": "code_path_flutter",
-    "short_name": "code_path_flutter",
+    "name": "codepath",
+    "short_name": "codepath",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
