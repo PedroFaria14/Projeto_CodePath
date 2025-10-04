@@ -11,6 +11,7 @@ class UserRegister(BaseModel):
     email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
     senha: str = Field(..., min_length=6)
     idade: int = Field(..., gt=0)
+    telefone: int = Field(..., gt=0)
 
 # Modelo de resposta
 class ApiResponse(BaseModel):
@@ -44,7 +45,8 @@ async def register_user(user: UserRegister):
             "streak": 1,
             "last_login": datetime.datetime.now(),
             "nivel": "iniciante",
-            "fases": INITIAL_FASES
+            "fases": INITIAL_FASES,
+            "telefone": user.telefone
         }
         users_ref.add(user_data)
         return {"success": True, "message": "Usuário cadastrado com sucesso!"}

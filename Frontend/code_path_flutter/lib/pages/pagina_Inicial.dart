@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'login.dart';
 import 'trilhaUm.dart';
+import 'cadastro.dart';
 
 class TelaInicial extends StatelessWidget {
   const TelaInicial({super.key});
@@ -71,7 +72,7 @@ class TelaInicial extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const ModuloPage(),
+                            builder: (context) => const Cadastro(),
                           ),
                         );
                       },

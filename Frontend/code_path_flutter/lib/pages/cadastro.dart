@@ -1,8 +1,68 @@
-import 'package:codepath/pages/login.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'login.dart';
 
-class Cadastro extends StatelessWidget {
+class Cadastro extends StatefulWidget {
   const Cadastro({super.key});
+
+  @override
+  State<Cadastro> createState() => _CadastroState();
+}
+
+class _CadastroState extends State<Cadastro> {
+  //controladores de digitação
+
+  final TextEditingController nomeController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController telefoneController = TextEditingController();
+  final TextEditingController idadeController = TextEditingController();
+  final TextEditingController senhaController = TextEditingController();
+
+  bool isLoading = false;
+
+  Future<void> cadastrarUsuario() async {
+    setState(() => isLoading = true);
+
+    try {
+      final url = Uri.parse("http://10.0.2.2:8000/register"); // emulador
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "nome": nomeController.text.trim(),
+          "email": emailController.text.trim(),
+          "telefone": telefoneController.text.trim(),
+          "idade": idadeController.text.trim(),
+          "senha": senhaController.text.trim(),
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data["success"] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("✅ Cadastro realizado com sucesso!")),
+        );
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const Login()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data["message"] ?? "Erro ao cadastrar")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Erro de conexão: $e")));
+    }
+
+    setState(() => isLoading = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -37,6 +97,7 @@ class Cadastro extends StatelessWidget {
 
                   const SizedBox(height: 30),
                   TextField(
+                    controller: nomeController,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       filled: true,
@@ -52,6 +113,7 @@ class Cadastro extends StatelessWidget {
 
                   const SizedBox(height: 30),
                   TextField(
+                    controller: emailController,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       filled: true,
@@ -67,6 +129,7 @@ class Cadastro extends StatelessWidget {
 
                   const SizedBox(height: 30),
                   TextField(
+                    controller: telefoneController,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       filled: true,
@@ -81,11 +144,12 @@ class Cadastro extends StatelessWidget {
                   ),
                   const SizedBox(height: 30),
                   TextField(
+                    controller: idadeController,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: const Color(0xFF2C2C54),
-                      labelText: "Nickname",
+                      labelText: "Idade",
                       labelStyle: const TextStyle(color: Colors.white70),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -96,6 +160,7 @@ class Cadastro extends StatelessWidget {
 
                   const SizedBox(height: 30),
                   TextField(
+                    controller: senhaController,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       filled: true,
@@ -111,7 +176,7 @@ class Cadastro extends StatelessWidget {
 
                   const SizedBox(height: 30),
                   ElevatedButton(
-                    onPressed: () {},
+                    onPressed: isLoading ? null : cadastrarUsuario,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF3CB371),
                       minimumSize: const Size(double.infinity, 50),
