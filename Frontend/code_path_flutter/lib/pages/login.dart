@@ -104,7 +104,7 @@ class _LoginState extends State<Login> {
                   controller: emailController,
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: const Color(0xFF262840), // cor do fundo
+                    fillColor: const Color(0xFF262840),
                     hintText: 'E-mail',
                     hintStyle: const TextStyle(color: Colors.white70),
                     contentPadding: const EdgeInsets.symmetric(
@@ -125,10 +125,11 @@ class _LoginState extends State<Login> {
 
                 const SizedBox(height: 20),
                 TextField(
-                  controller: emailController,
+                  controller: senhaController,
+                  obscureText: true,
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: const Color(0xFF262840), // cor do fundo
+                    fillColor: const Color(0xFF262840),
                     hintText: 'Senha',
                     hintStyle: const TextStyle(color: Colors.white70),
                     contentPadding: const EdgeInsets.symmetric(

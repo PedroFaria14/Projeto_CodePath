@@ -14,9 +14,9 @@ class _CadastroState extends State<Cadastro> {
   //controladores de digitação
 
   final TextEditingController nomeController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController telefoneController = TextEditingController();
   final TextEditingController idadeController = TextEditingController();
+  final TextEditingController telefoneController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
   final TextEditingController senhaController = TextEditingController();
 
   bool isLoading = false;
@@ -31,12 +31,14 @@ class _CadastroState extends State<Cadastro> {
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "nome": nomeController.text.trim(),
+          "idade": int.tryParse(idadeController.text.trim()) ?? 0,
+          "telefone": int.tryParse(telefoneController.text.trim()) ?? 0,
           "email": emailController.text.trim(),
-          "telefone": telefoneController.text.trim(),
-          "idade": idadeController.text.trim(),
           "senha": senhaController.text.trim(),
         }),
       );
+
+      print("Resposta da API: ${response.statusCode} - ${response.body}");
 
       final data = jsonDecode(response.body);
 
@@ -110,6 +112,36 @@ class _CadastroState extends State<Cadastro> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 30),
+                  TextField(
+                    controller: idadeController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: const Color(0xFF2C2C54),
+                      labelText: "Idade",
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  TextField(
+                    controller: telefoneController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: const Color(0xFF2C2C54),
+                      labelText: "Telefone",
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
 
                   const SizedBox(height: 30),
                   TextField(
@@ -126,38 +158,6 @@ class _CadastroState extends State<Cadastro> {
                       ),
                     ),
                   ),
-
-                  const SizedBox(height: 30),
-                  TextField(
-                    controller: telefoneController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFF2C2C54),
-                      labelText: "Telefone",
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  TextField(
-                    controller: idadeController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFF2C2C54),
-                      labelText: "Idade",
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-
                   const SizedBox(height: 30),
                   TextField(
                     controller: senhaController,
