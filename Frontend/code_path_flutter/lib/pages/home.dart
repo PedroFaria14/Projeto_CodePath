@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'login.dart';
 import 'trilhaUm.dart';
 
 class PaginaHome extends StatefulWidget {
@@ -10,27 +13,72 @@ class PaginaHome extends StatefulWidget {
 }
 
 class _PaginaHomeState extends State<PaginaHome> {
+  bool _carregando = true;
+  Map<String, dynamic>? _usuario;
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarUsuario();
+  }
+
+  Future<void> _carregarUsuario() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString("userEmail");
+
+    if (email == null || email.isEmpty) {
+      print("Nenhum email encontrado localmente");
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const Login()),
+      );
+      return;
+    }
+
+    try {
+      final url = Uri.parse("http://10.0.2.2:8000/profile/$email");
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _usuario = data;
+          _carregando = false;
+        });
+      } else {
+        print("Erro ao carregar perfil: ${response.body}");
+        setState(() => _carregando = false);
+      }
+    } catch (e) {
+      print("Erro ao conectar com o servidor: $e");
+      setState(() => _carregando = false);
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
     if (index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => const ModuloPage(),
-        ), // continuar trilha
+        MaterialPageRoute(builder: (_) => TrilhaUm(fases: _usuario!["fases"])),
       );
     } else if (index == 2) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const ModuloPage()),
+        MaterialPageRoute(builder: (_) => TrilhaUm(fases: _usuario!["fases"])),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_carregando) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: Colors.green)),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF90EE90),
       body: Container(
@@ -42,7 +90,6 @@ class _PaginaHomeState extends State<PaginaHome> {
             stops: [0.2, 0.6, 1.0],
           ),
         ),
-
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -50,13 +97,12 @@ class _PaginaHomeState extends State<PaginaHome> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // CABEÇALHO
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        "Olá, dev! 👋",
-                        style: TextStyle(
+                      Text(
+                        "Olá, ${_usuario?["nome"] ?? "Aluno"} 👋",
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF2C2C54),
@@ -68,10 +114,7 @@ class _PaginaHomeState extends State<PaginaHome> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 20),
-
-                  // CARD DE PROGRESSO
                   Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
@@ -105,17 +148,14 @@ class _PaginaHomeState extends State<PaginaHome> {
                           minHeight: 10,
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          "Nível 2 • Explorador da Lógica 🧠",
-                          style: TextStyle(color: Colors.white),
+                        Text(
+                          "Nível ${_usuario?["nivel"] ?? "1"} • Explorador da Lógica 🧠",
+                          style: const TextStyle(color: Colors.white),
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 30),
-
-                  // SEÇÃO DE TRILHAS
                   const Text(
                     "Trilhas disponíveis",
                     style: TextStyle(
@@ -125,7 +165,6 @@ class _PaginaHomeState extends State<PaginaHome> {
                     ),
                   ),
                   const SizedBox(height: 15),
-
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
@@ -151,38 +190,12 @@ class _PaginaHomeState extends State<PaginaHome> {
                       trilhaCard("Flutter Mobile 📱", Colors.teal, 0.3),
                     ],
                   ),
-
-                  const SizedBox(height: 30),
-
-                  // SEÇÃO RECOMENDADOS
-                  const Text(
-                    "Recomendados para você",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2C2C54),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  recomendacaoCard(
-                    "Desafios de Lógica",
-                    "Aprimore seu raciocínio!",
-                    Icons.extension,
-                  ),
-                  recomendacaoCard(
-                    "Quiz do Dia",
-                    "Testes rápidos de programação",
-                    Icons.quiz,
-                  ),
                 ],
               ),
             ),
           ),
         ),
       ),
-
-      // BARRA INFERIOR
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
@@ -237,36 +250,6 @@ class _PaginaHomeState extends State<PaginaHome> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget recomendacaoCard(String titulo, String subtitulo, IconData icone) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2C2C54),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: Icon(icone, color: Colors.white),
-        title: Text(
-          titulo,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        subtitle: Text(
-          subtitulo,
-          style: const TextStyle(color: Colors.white70),
-        ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios,
-          color: Colors.white,
-          size: 18,
-        ),
-        onTap: () {},
       ),
     );
   }

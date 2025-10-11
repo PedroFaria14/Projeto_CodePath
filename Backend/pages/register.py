@@ -39,14 +39,14 @@ async def register_user(user: UserRegister):
 
         user_data = {
             "nome": user.nome,
+            "idade": user.idade,
+            "telefone": user.telefone,
             "email": user.email,
             "senha": user.senha,
-            "idade": user.idade,
             "streak": 1,
             "last_login": datetime.datetime.now(),
             "nivel": "iniciante",
             "fases": INITIAL_FASES,
-            "telefone": user.telefone
         }
         users_ref.add(user_data)
         return {"success": True, "message": "Usuário cadastrado com sucesso!"}
