@@ -3,6 +3,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from firebase_config import db
 from scripts.gemini import gerar_explicacao
+from google.cloud.firestore_v1.base_query import FieldFilter
+
 router = APIRouter()
 
 class Pergunta(BaseModel):
@@ -31,32 +33,30 @@ class ApiResponseQuestions(BaseModel):
     
 
 #buscar pergunta aleatória por nível
-@router.get("/pergunta/{nivel}", response_model=ApiResponseQuestions)
-async def get_pergunta(nivel: str):
+@router.get("/pergunta/", response_model=ApiResponseQuestions)
+async def get_pergunta(nivel: str, tipo: str):
     try:
-        perguntas_ref = db.collection("perguntas").where("nivel", "==", nivel)
+        perguntas_ref = db.collection("perguntas").where(filter=FieldFilter('nivel', '==', nivel)).where(filter=FieldFilter('tipo', '==', tipo))
         docs = perguntas_ref.stream()
         perguntas = [doc.to_dict() for doc in docs]
 
         if not perguntas:
-            raise HTTPException(status_code=404, detail="Nenhuma pergunta encontrada para esse nível")
+             raise HTTPException(status_code=404, detail="Nenhuma pergunta encontrada para esse nível e tipo")
 
         pergunta = random.choice(perguntas)
-        return ApiResponse(success=True, message="Pergunta encontrada", pergunta=pergunta)
+        return ApiResponseQuestions(success=True, message="Pergunta encontrada", pergunta=pergunta)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+       raise HTTPException(status_code=500, detail=str(e))
 
 # função auxiliar para buscar a persona pelo Modulo/Tipo do exercício
 async def get_persona_by_tipo(tipo_exercicio: str):
     docs = db.collection("personas").where("tipo", "==", tipo_exercicio).limit(1).stream()
-    
+ 
     for doc in docs:
-        return doc.to_dict()
-    
-    # Se não encontrar uma persona com esse tipo, retorna a persona 'papagaio' como padrão
+        return doc.to_dict() 
+ # Se não encontrar uma persona com esse tipo, retorna a persona 'papagaio' como padrão
     doc_padrao = db.collection("personas").document("erro").get()
     return doc_padrao.to_dict()
-
 #  validar resposta 
 @router.post("/responder", response_model=ApiResponse)
 async def responder(resposta: RespostaUsuario):
