@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class QuestaoPage extends StatefulWidget {
   final int faseId;
@@ -10,6 +13,44 @@ class QuestaoPage extends StatefulWidget {
 }
 
 class _QuestaoPageState extends State<QuestaoPage> {
+  // 🔹 Função para salvar o progresso no backend e liberar a próxima fase
+  Future<void> salvarProgresso(int faseAtual) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final email = prefs.getString("userEmail");
+      if (email == null) return;
+
+      // 1️⃣ Buscar o progresso atual do usuário
+      final response = await http.get(
+        Uri.parse("http://10.0.2.2:8000/profile/$email"),
+      );
+      if (response.statusCode != 200) return;
+
+      final data = jsonDecode(response.body);
+      final user = data["user"];
+      final fases = List<Map<String, dynamic>>.from(user["fases"]);
+
+      // 2️⃣ Atualizar a fase atual e liberar a próxima
+      for (var fase in fases) {
+        if (fase["id"] == faseAtual) {
+          fase["atual"] = false;
+        } else if (fase["id"] == faseAtual + 1) {
+          fase["liberada"] = true;
+          fase["atual"] = true;
+        }
+      }
+
+      // 3️⃣ Enviar o progresso atualizado pro backend
+      await http.post(
+        Uri.parse("http://10.0.2.2:8000/salvar_progresso"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email, "fases": fases}),
+      );
+    } catch (e) {
+      debugPrint("Erro ao salvar progresso: $e");
+    }
+  }
+
   String enunciado = "";
   String codigo = "";
   List<String> alternativas = [];
@@ -25,7 +66,7 @@ class _QuestaoPageState extends State<QuestaoPage> {
 
   // 🔹 Simulação de banco de dados local
   Future<void> carregarQuestao() async {
-    await Future.delayed(const Duration(milliseconds: 500)); // simula atraso
+    await Future.delayed(const Duration(milliseconds: 300)); // simula atraso
 
     final questoes = {
       1: {
@@ -72,7 +113,12 @@ class _QuestaoPageState extends State<QuestaoPage> {
     );
 
     if (correta) {
-      // Aqui depois você chama o backend para atualizar progresso
+      salvarProgresso(widget.faseId);
+
+      // Pequeno delay para mostrar o snackbar antes de voltar
+      Future.delayed(const Duration(seconds: 1), () {
+        Navigator.pop(context);
+      });
     }
   }
 
