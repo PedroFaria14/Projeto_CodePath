@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'trilhaUm.dart';
-//import 'perfil.dart'; // ← página de perfil (caso ainda não exista, crie depois)
-import 'login.dart';
+import 'perfil.dart'; // ← página de perfil (caso ainda não exista, crie depois)
 
 class PaginaHome extends StatefulWidget {
   const PaginaHome({super.key});
@@ -109,7 +108,10 @@ class _PaginaHomeState extends State<PaginaHome> {
         }
       }
     } else if (index == 2) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const Login()));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PerfilPage()),
+      );
     }
   }
 
