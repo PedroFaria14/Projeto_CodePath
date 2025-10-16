@@ -94,3 +94,16 @@ async def responder(resposta: RespostaUsuario):
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/modulos")
+async def listar_modulos():
+    try:
+        perguntas_ref = db.collection("perguntas").stream()
+        tipos = {doc.to_dict().get("tipo") for doc in perguntas_ref if doc.to_dict().get("tipo")}
+        
+        if not tipos:
+            return {"success": False, "message": "Nenhum módulo encontrado.", "modulos": []}
+
+        return {"success": True, "message": "Módulos encontrados.", "modulos": list(tipos)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
