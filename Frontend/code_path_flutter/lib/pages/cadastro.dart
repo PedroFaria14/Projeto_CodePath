@@ -32,7 +32,7 @@ class _CadastroState extends State<Cadastro> {
         body: jsonEncode({
           "nome": nomeController.text.trim(),
           "idade": int.tryParse(idadeController.text.trim()) ?? 0,
-          "telefone": int.tryParse(telefoneController.text.trim()) ?? 0,
+          "telefone": telefoneController.text.trim(),
           "email": emailController.text.trim(),
           "senha": senhaController.text.trim(),
         }),
