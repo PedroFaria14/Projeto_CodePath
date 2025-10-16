@@ -65,20 +65,17 @@ class _TrilhaUmState extends State<TrilhaUm> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFDFF5E1),
-      appBar: AppBar(
-        backgroundColor: Colors.green.shade700,
-        title: Text(widget.tipoModulo),
-      ),
+
       body: carregando
           ? const Center(child: CircularProgressIndicator())
           : LayoutBuilder(
               builder: (context, constraints) {
                 final posicoes = [
                   const Offset(0.24, 0.165),
-                  const Offset(0.60, 0.29),
-                  const Offset(0.42, 0.47),
-                  const Offset(0.60, 0.64),
-                  const Offset(0.45, 0.82),
+                  const Offset(0.64, 0.377),
+                  const Offset(0.393, 0.577),
+                  const Offset(0.58, 0.73),
+                  const Offset(0.435, 0.87),
                 ];
 
                 return Stack(
