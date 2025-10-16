@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'trilhaUm.dart';
 
 class QuestaoPage extends StatefulWidget {
   final int faseId;
@@ -115,9 +116,36 @@ class _QuestaoPageState extends State<QuestaoPage> {
     if (correta) {
       salvarProgresso(widget.faseId);
 
-      // Pequeno delay para mostrar o snackbar antes de voltar
-      Future.delayed(const Duration(seconds: 1), () {
-        Navigator.pop(context);
+      // Pequeno delay para mostrar o snackbar antes de voltar pra trilha
+      Future.delayed(const Duration(seconds: 1), () async {
+        final prefs = await SharedPreferences.getInstance();
+        final email = prefs.getString("userEmail");
+
+        if (!mounted) return;
+
+        // 🔹 Recarrega dados atualizados do backend
+        final response = await http.get(
+          Uri.parse("http://10.0.2.2:8000/profile/$email"),
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final fasesAtualizadas = List<Map<String, dynamic>>.from(
+            data["user"]["fases"],
+          );
+
+          // Substitui a tela atual pela trilha, mostrando o progresso atualizado
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TrilhaUm(
+                tipoModulo: fasesAtualizadas.first["tipo"] ?? "Desconhecido",
+                fases: fasesAtualizadas,
+              ),
+            ),
+          );
+        } else {
+          Navigator.pop(context); // fallback em caso de erro
+        }
       });
     }
   }
