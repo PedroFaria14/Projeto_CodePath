@@ -12,7 +12,7 @@ class PaginaHome extends StatefulWidget {
   State<PaginaHome> createState() => _PaginaHomeState();
 }
 
-class _PaginaHomeState extends State<PaginaHome> {
+class _PaginaHomeState extends State<PaginaHome> with RouteAware {
   List<String> modulos = [];
   bool carregando = true;
   int streak = 0;
@@ -23,6 +23,13 @@ class _PaginaHomeState extends State<PaginaHome> {
   void initState() {
     super.initState();
     carregarModulos();
+    carregarUsuario();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 🔁 Sempre que voltar pra essa rota, atualiza o usuário
     carregarUsuario();
   }
 
@@ -46,11 +53,11 @@ class _PaginaHomeState extends State<PaginaHome> {
     }
   }
 
-  /// 🔹 Busca nome e streak do usuário
   Future<void> carregarUsuario() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final email = prefs.getString("userEmail");
+      final email = prefs.getString("userEmail"); // ✅ corrigido
+
       if (email == null || email.isEmpty) return;
 
       final response = await http.get(
@@ -71,7 +78,6 @@ class _PaginaHomeState extends State<PaginaHome> {
     }
   }
 
-  /// 🔹 Abre trilha com as fases do módulo selecionado
   Future<void> abrirTrilha(String tipoModulo) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -88,7 +94,6 @@ class _PaginaHomeState extends State<PaginaHome> {
         final fasesData = user["fases"];
         List<Map<String, dynamic>> fases = [];
 
-        // 🔹 Compatível com versões antigas e novas
         if (fasesData is List) {
           fases = List<Map<String, dynamic>>.from(fasesData);
         } else if (fasesData is Map && fasesData.containsKey(tipoModulo)) {
@@ -122,10 +127,12 @@ class _PaginaHomeState extends State<PaginaHome> {
       }
     } else if (index == 2) {
       if (email != null) {
-        Navigator.push(
+        await Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const PerfilPage()),
         );
+        // 🔁 Ao voltar, atualiza dados
+        carregarUsuario();
       }
     }
   }
@@ -161,11 +168,12 @@ class _PaginaHomeState extends State<PaginaHome> {
                 const SizedBox(width: 12),
                 IconButton(
                   icon: const Icon(Icons.settings, color: Colors.white),
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const PerfilPage()),
                     );
+                    carregarUsuario();
                   },
                 ),
               ],

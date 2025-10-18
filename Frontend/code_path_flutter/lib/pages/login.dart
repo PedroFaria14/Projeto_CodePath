@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'cadastro.dart';
@@ -33,13 +34,21 @@ class _LoginState extends State<Login> {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data["success"] == true) {
+        // 🎯 PASSO 1: Salvar o e-mail no SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString("userEmail", emailController.text.trim());
+        // O 'userEmail' é a chave que você usa na PaginaHome para buscar o perfil.
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Login realizado com sucesso!")),
         );
 
-        Navigator.push(
+        // 🎯 PASSO 2: Usar pushReplacement
+        // Isso substitui a tela de Login pela Home, impedindo que o usuário volte
+        // para a tela de Login com o botão "voltar" do celular.
+        Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => PaginaHome()),
+          MaterialPageRoute(builder: (_) => const PaginaHome()),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
