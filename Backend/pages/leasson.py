@@ -36,18 +36,41 @@ class ApiResponseQuestions(BaseModel):
 @router.get("/pergunta/", response_model=ApiResponseQuestions)
 async def get_pergunta(nivel: str, tipo: str):
     try:
-        perguntas_ref = db.collection("perguntas").where(filter=FieldFilter('nivel', '==', nivel)).where(filter=FieldFilter('tipo', '==', tipo))
+        # Mapeia níveis do app para o Firebase
+        mapa_niveis = {
+            "iniciante": "Facil",
+            "intermediario": "Medio",
+            "avancado": "Dificil"
+        }
+        nivel = mapa_niveis.get(nivel.lower(), nivel)
+
+        perguntas_ref = (
+            db.collection("perguntas")
+            .where("nivel", "==", nivel)
+            .where("tipo", "==", tipo)
+        )
+
         docs = perguntas_ref.stream()
         perguntas = [doc.to_dict() for doc in docs]
 
         if not perguntas:
-             raise HTTPException(status_code=404, detail="Nenhuma pergunta encontrada para esse nível e tipo")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Nenhuma pergunta encontrada para {nivel} e {tipo}"
+            )
 
         pergunta = random.choice(perguntas)
-        return ApiResponseQuestions(success=True, message="Pergunta encontrada", pergunta=pergunta)
+        return ApiResponseQuestions(
+            success=True,
+            message="Pergunta encontrada",
+            pergunta=pergunta
+        )
+    except HTTPException as e:
+        raise e
     except Exception as e:
-       raise HTTPException(status_code=500, detail=str(e))
-
+        print(f"❌ Erro ao buscar pergunta: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 # função auxiliar para buscar a persona pelo Modulo/Tipo do exercício
 async def get_persona_by_tipo(tipo_exercicio: str):
     docs = db.collection("personas").where("tipo", "==", tipo_exercicio).limit(1).stream()
