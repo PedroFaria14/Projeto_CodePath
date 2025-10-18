@@ -6,58 +6,25 @@ import 'trilhaUm.dart';
 
 class QuestaoPage extends StatefulWidget {
   final int faseId;
+  final String tipoModulo;
 
-  const QuestaoPage({super.key, required this.faseId});
+  const QuestaoPage({
+    super.key,
+    required this.faseId,
+    required this.tipoModulo,
+  });
 
   @override
   State<QuestaoPage> createState() => _QuestaoPageState();
 }
 
 class _QuestaoPageState extends State<QuestaoPage> {
-  // 🔹 Função para salvar o progresso no backend e liberar a próxima fase
-  Future<void> salvarProgresso(int faseAtual) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final email = prefs.getString("userEmail");
-      if (email == null) return;
-
-      // 1️⃣ Buscar o progresso atual do usuário
-      final response = await http.get(
-        Uri.parse("http://10.0.2.2:8000/profile/$email"),
-      );
-      if (response.statusCode != 200) return;
-
-      final data = jsonDecode(response.body);
-      final user = data["user"];
-      final fases = List<Map<String, dynamic>>.from(user["fases"]);
-
-      // 2️⃣ Atualizar a fase atual e liberar a próxima
-      for (var fase in fases) {
-        if (fase["id"] == faseAtual) {
-          fase["atual"] = false;
-        } else if (fase["id"] == faseAtual + 1) {
-          fase["liberada"] = true;
-          fase["atual"] = true;
-        }
-      }
-
-      // 3️⃣ Enviar o progresso atualizado pro backend
-      await http.post(
-        Uri.parse("http://10.0.2.2:8000/salvar_progresso"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"email": email, "fases": fases}),
-      );
-    } catch (e) {
-      debugPrint("Erro ao salvar progresso: $e");
-    }
-  }
-
   String enunciado = "";
-  String codigo = "";
   List<String> alternativas = [];
   int respostaCorreta = 0;
   bool carregando = true;
   int? alternativaSelecionada;
+  String idPergunta = "";
 
   @override
   void initState() {
@@ -65,39 +32,148 @@ class _QuestaoPageState extends State<QuestaoPage> {
     carregarQuestao();
   }
 
-  // 🔹 Simulação de banco de dados local
   Future<void> carregarQuestao() async {
-    await Future.delayed(const Duration(milliseconds: 300)); // simula atraso
+    try {
+      setState(() => carregando = true);
 
-    final questoes = {
-      1: {
-        "enunciado": "Qual será a saída do código abaixo?",
-        "codigo": "for i in range(3):\n    print(i)",
-        "alternativas": ["0 1 2", "1 2 3", "Erro", "Nenhuma das anteriores"],
-        "respostaCorreta": 0,
-      },
-      2: {
-        "enunciado": "Qual estrutura repete até uma condição ser falsa?",
-        "codigo": "while x < 5:\n    print(x)",
-        "alternativas": ["if", "while", "for", "switch"],
-        "respostaCorreta": 1,
-      },
-    };
+      final prefs = await SharedPreferences.getInstance();
+      final nivel = prefs.getString("userNivel") ?? "iniciante";
 
-    final dados = questoes[widget.faseId];
+      // 🔹 Conversão do nível do app para o do Firebase
+      final mapaNiveis = {
+        "iniciante": "Facil",
+        "intermediario": "Medio",
+        "avancado": "Dificil",
+      };
 
-    if (dados != null) {
-      setState(() {
-        enunciado = dados["enunciado"] as String;
-        codigo = dados["codigo"] as String;
-        alternativas = List<String>.from(dados["alternativas"] as List);
-        respostaCorreta = dados["respostaCorreta"] as int;
-        carregando = false;
-      });
+      final nivelFirebase = mapaNiveis[nivel.toLowerCase()] ?? "Facil";
+
+      debugPrint(
+        "Buscando pergunta para módulo: ${widget.tipoModulo} e nível: $nivelFirebase",
+      );
+
+      final response = await http.get(
+        Uri.parse(
+          "http://10.0.2.2:8000/pergunta/?nivel=$nivelFirebase&tipo=${Uri.encodeComponent(widget.tipoModulo)}",
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final pergunta = data["pergunta"];
+
+        setState(() {
+          enunciado = pergunta["pergunta"];
+          alternativas = List<String>.from(pergunta["opcoes"]);
+          respostaCorreta = alternativas.indexOf(pergunta["resposta_correta"]);
+          idPergunta = pergunta["idPergunta"];
+          carregando = false;
+        });
+      } else {
+        debugPrint("Erro ao buscar pergunta: ${response.statusCode}");
+      }
+    } catch (e) {
+      debugPrint("Erro: $e");
     }
   }
 
-  void validarResposta() {
+  Future<void> salvarProgresso(int faseAtual) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final email = prefs.getString("userEmail");
+      if (email == null) return;
+
+      // 1) Pegar o usuário atual do backend
+      final profileResp = await http.get(
+        Uri.parse("http://10.0.2.2:8000/profile/$email"),
+      );
+      if (profileResp.statusCode != 200) {
+        debugPrint(
+          "salvarProgresso: falha ao buscar profile ${profileResp.statusCode}",
+        );
+        return;
+      }
+
+      final profileData = jsonDecode(profileResp.body);
+      final user = profileData["user"] ?? profileData;
+
+      // 2) Normaliza o campo 'fases' do usuário para um Map<String, List>
+      final dynamic rawFases = user["fases"];
+      Map<String, dynamic> fasesMap = {};
+
+      if (rawFases == null) {
+        // sem dados ainda -> criamos mapa vazio
+        fasesMap = {};
+      } else if (rawFases is Map) {
+        // já está no formato por módulo
+        fasesMap = Map<String, dynamic>.from(rawFases);
+      } else if (rawFases is List) {
+        // formato antigo: lista única -> colocamos ela dentro do módulo atual
+        fasesMap = {
+          widget.tipoModulo: List<Map<String, dynamic>>.from(rawFases),
+        };
+      } else {
+        // fallback
+        fasesMap = {};
+      }
+
+      // 3) Pega lista do módulo atual (ou inicializa se vazio)
+      List<Map<String, dynamic>> moduleFases = [];
+      if (fasesMap.containsKey(widget.tipoModulo) &&
+          fasesMap[widget.tipoModulo] is List) {
+        moduleFases = List<Map<String, dynamic>>.from(
+          fasesMap[widget.tipoModulo],
+        );
+      }
+
+      // Se moduleFases estiver vazio, inicializa um conjunto padrão (exemplo 5 fases)
+      if (moduleFases.isEmpty) {
+        moduleFases = List.generate(
+          5,
+          (i) => {
+            "id": i + 1,
+            "liberada": i == 0 ? true : false,
+            "atual": i == 0 ? true : false,
+          },
+        );
+      }
+
+      // 4) Atualiza o módulo atual *sem tocar nos outros módulos*
+      for (var fase in moduleFases) {
+        // marca 'atual' somente para a próxima fase (faseAtual + 1)
+        fase["atual"] = fase["id"] == (faseAtual + 1);
+        // libera a próxima sem travar fases já liberadas
+        fase["liberada"] =
+            fase["liberada"] == true || fase["id"] == (faseAtual + 1);
+      }
+
+      // 5) Atualiza o mapa e prepara payload
+      fasesMap[widget.tipoModulo] = moduleFases;
+
+      final payload = {
+        "email": email,
+        "tipo": widget.tipoModulo, // campo que o backend espera
+        "fases": moduleFases,
+      };
+
+      debugPrint("salvarProgresso -> payload: ${jsonEncode(payload)}");
+
+      // 6) Chama o endpoint para salvar apenas o módulo atual
+      final saveResp = await http.post(
+        Uri.parse("http://10.0.2.2:8000/salvar_progresso"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(payload),
+      );
+
+      debugPrint(
+        "salvarProgresso -> status: ${saveResp.statusCode}, body: ${saveResp.body}",
+      );
+    } catch (e) {
+      debugPrint("Erro ao salvar progresso: $e");
+    }
+  }
+
+  void validarResposta() async {
     if (alternativaSelecionada == null) return;
 
     final correta = alternativaSelecionada == respostaCorreta;
@@ -114,37 +190,39 @@ class _QuestaoPageState extends State<QuestaoPage> {
     );
 
     if (correta) {
-      salvarProgresso(widget.faseId);
+      await salvarProgresso(widget.faseId);
 
-      // Pequeno delay para mostrar o snackbar antes de voltar pra trilha
       Future.delayed(const Duration(seconds: 1), () async {
         final prefs = await SharedPreferences.getInstance();
         final email = prefs.getString("userEmail");
 
-        if (!mounted) return;
+        if (!mounted || email == null) return;
 
-        // 🔹 Recarrega dados atualizados do backend
         final response = await http.get(
           Uri.parse("http://10.0.2.2:8000/profile/$email"),
         );
+
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          final fasesAtualizadas = List<Map<String, dynamic>>.from(
-            data["user"]["fases"],
+          final user = data["user"];
+
+          final Map<String, dynamic> fasesMap = Map<String, dynamic>.from(
+            user["fases"] ?? {},
+          );
+          final List fasesAtualizadas = List<Map<String, dynamic>>.from(
+            fasesMap[widget.tipoModulo] ?? [],
           );
 
-          // Substitui a tela atual pela trilha, mostrando o progresso atualizado
-          Navigator.pushReplacement(
+          Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(
               builder: (_) => TrilhaUm(
-                tipoModulo: fasesAtualizadas.first["tipo"] ?? "Desconhecido",
+                tipoModulo: widget.tipoModulo,
                 fases: fasesAtualizadas,
               ),
             ),
+            (route) => false,
           );
-        } else {
-          Navigator.pop(context); // fallback em caso de erro
         }
       });
     }
@@ -165,7 +243,7 @@ class _QuestaoPageState extends State<QuestaoPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          "Fase ${widget.faseId}",
+          "Fase ${widget.faseId} - ${widget.tipoModulo}",
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -178,30 +256,12 @@ class _QuestaoPageState extends State<QuestaoPage> {
           children: [
             Image.asset("assets/imagens/gato1.png", height: 80),
             const SizedBox(height: 12),
-
             Text(
               enunciado,
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-
-            const SizedBox(height: 16),
-
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green.shade200,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                codigo,
-                style: const TextStyle(fontFamily: "monospace", fontSize: 16),
-              ),
-            ),
-
             const SizedBox(height: 20),
-
-            // Alternativas
             ...alternativas.asMap().entries.map((entry) {
               final index = entry.key;
               final texto = entry.value;
@@ -226,9 +286,7 @@ class _QuestaoPageState extends State<QuestaoPage> {
                 ),
               );
             }),
-
             const Spacer(),
-
             ElevatedButton(
               onPressed: validarResposta,
               style: ElevatedButton.styleFrom(

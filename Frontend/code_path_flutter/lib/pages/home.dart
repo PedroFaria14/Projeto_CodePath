@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'trilhaUm.dart';
-import 'perfil.dart'; // ← página de perfil (caso ainda não exista, crie depois)
+import 'perfil.dart';
 
 class PaginaHome extends StatefulWidget {
   const PaginaHome({super.key});
@@ -15,9 +15,9 @@ class PaginaHome extends StatefulWidget {
 class _PaginaHomeState extends State<PaginaHome> {
   List<String> modulos = [];
   bool carregando = true;
-  int _selectedIndex = 0;
   int streak = 0;
   String nomeUsuario = "Usuário";
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -26,58 +26,34 @@ class _PaginaHomeState extends State<PaginaHome> {
     carregarUsuario();
   }
 
-  Future<void> carregarUsuario() async {
-    final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString("email") ?? "";
-
-    if (email.isEmpty) return;
-
-    try {
-      final response = await http.get(
-        Uri.parse("http://10.0.2.2:8000/profile/$email"),
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data["success"] == true && data["user"] != null) {
-          setState(() {
-            streak = data["user"]["streak"] ?? 0;
-            nomeUsuario = data["user"]["nome"] ?? "Usuário";
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint("Erro ao carregar perfil: $e");
-    }
-  }
-
   Future<void> carregarModulos() async {
     try {
       final response = await http.get(
         Uri.parse("http://10.0.2.2:8000/modulos"),
       );
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
           modulos = List<String>.from(data["modulos"]);
           carregando = false;
         });
+      } else {
+        debugPrint("Erro ao buscar módulos: ${response.statusCode}");
       }
     } catch (e) {
       debugPrint("Erro ao carregar módulos: $e");
     }
   }
 
-  void _onItemTapped(int index) async {
-    setState(() => _selectedIndex = index);
-
-    if (index == 0) {
-      // já está na Home
-    } else if (index == 1) {
-      // CONTINUAR TRILHA
+  /// 🔹 Busca nome e streak do usuário e guarda em estado
+  Future<void> carregarUsuario() async {
+    try {
       final prefs = await SharedPreferences.getInstance();
-      final email = prefs.getString("email") ?? "";
-
-      if (email.isEmpty) return;
+      final email = prefs.getString(
+        "userEmail",
+      ); // verifique a chave usada no login
+      if (email == null || email.isEmpty) return;
 
       final response = await http.get(
         Uri.parse("http://10.0.2.2:8000/profile/$email"),
@@ -85,33 +61,66 @@ class _PaginaHomeState extends State<PaginaHome> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final fases = data["user"]["fases"] as List?;
-        final faseAtual = fases?.firstWhere(
-          (f) => f["atual"] == true,
-          orElse: () => null,
-        );
 
-        if (faseAtual != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => TrilhaUm(tipoModulo: "Python do Zero 🐍"),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Nenhuma fase encontrada no perfil."),
-              backgroundColor: Colors.black54,
-            ),
-          );
-        }
+        setState(() {
+          streak = data["user"]["streak"] ?? 0;
+          nomeUsuario = data["user"]["nome"] ?? "Usuário";
+        });
+      } else {
+        debugPrint("Erro ao carregar perfil: ${response.body}");
+      }
+    } catch (e) {
+      debugPrint("Erro ao carregar usuário: $e");
+    }
+  }
+
+  /// 🔹 Abre trilha de aprendizado (busca fases do usuário e abre a tela)
+  Future<void> abrirTrilha(String tipoModulo) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final email = prefs.getString("userEmail");
+      if (email == null) return;
+
+      final response = await http.get(
+        Uri.parse("http://10.0.2.2:8000/profile/$email"),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final user = data["user"] ?? data;
+        final fases = List<Map<String, dynamic>>.from(user["fases"] ?? []);
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TrilhaUm(tipoModulo: tipoModulo, fases: fases),
+          ),
+        );
+      } else {
+        debugPrint("Erro ao carregar fases do usuário: ${response.body}");
+      }
+    } catch (e) {
+      debugPrint("Erro ao abrir trilha: $e");
+    }
+  }
+
+  void _onItemTapped(int index) async {
+    setState(() => _selectedIndex = index);
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString("userEmail");
+
+    if (index == 0) {
+    } else if (index == 1) {
+      if (modulos.isNotEmpty) {
+        abrirTrilha(modulos.first);
       }
     } else if (index == 2) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const PerfilPage()),
-      );
+      if (email != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PerfilPage()),
+        );
+      }
     }
   }
 
@@ -119,125 +128,109 @@ class _PaginaHomeState extends State<PaginaHome> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFDFF5E1),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 🔹 CABEÇALHO SUPERIOR
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      appBar: AppBar(
+        backgroundColor: Colors.green.shade700,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "Olá, $nomeUsuario 👋",
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            Row(
+              children: [
+                // 🔥 Streak (dias consecutivos)
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.local_fire_department,
+                      color: Colors.orangeAccent,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      "$streak",
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                // ⚙️ Botão de configurações
+                IconButton(
+                  icon: const Icon(Icons.settings, color: Colors.white),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PerfilPage()),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      body: carregando
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Olá, $nomeUsuario 👋",
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2C2C54),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.local_fire_department,
-                            color: Colors.orange,
+                  const Text(
+                    "Trilhas disponíveis",
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: GridView.builder(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 1.2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            "$streak streak",
-                            style: const TextStyle(
-                              color: Colors.black87,
-                              fontWeight: FontWeight.w600,
+                      itemCount: modulos.length,
+                      itemBuilder: (context, index) {
+                        final modulo = modulos[index];
+                        return GestureDetector(
+                          onTap: () => abrirTrilha(modulo),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade200,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 4,
+                                  offset: Offset(2, 2),
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                modulo,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.settings, color: Colors.black87),
-                    onPressed: () {
-                      // TODO: abrir tela de configurações
-                    },
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
+            ),
 
-              const SizedBox(height: 20),
-
-              // 🔹 CORPO PRINCIPAL
-              const Text(
-                "Trilhas disponíveis",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-
-              Expanded(
-                child: carregando
-                    ? const Center(child: CircularProgressIndicator())
-                    : GridView.builder(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              childAspectRatio: 1.2,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                            ),
-                        itemCount: modulos.length,
-                        itemBuilder: (context, index) {
-                          final modulo = modulos[index];
-                          return GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => TrilhaUm(tipoModulo: modulo),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade300,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.green.withOpacity(0.3),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: Text(
-                                  modulo,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-
-      // 🔹 BARRA INFERIOR
+      /// 🔹 Barra inferior
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-        selectedItemColor: const Color(0xFF2C2C54),
+        selectedItemColor: Colors.green.shade800,
         unselectedItemColor: Colors.black54,
         backgroundColor: const Color(0xFFE0F8E0),
         items: const [
