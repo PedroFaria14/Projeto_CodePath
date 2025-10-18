@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'faseUmTrilha1.dart';
+import 'faseUmTrilha1.dart'; // tela da fase (QuestaoPage)
 
 class TrilhaUm extends StatelessWidget {
   final String tipoModulo;
@@ -41,43 +41,14 @@ class TrilhaUm extends StatelessWidget {
                     alignment: Alignment.center,
                     clipBehavior: Clip.none,
                     children: [
-                      Container(
-                        width: 70,
-                        height: 70,
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.black26, width: 2),
-                        ),
-                        child: const Icon(
-                          Icons.star,
-                          color: Colors.yellow,
-                          size: 35,
-                        ),
-                      ),
+                      _faseCirculo(true),
                       Positioned(
                         top: -80,
                         child: Column(
                           children: [
                             Image.asset("assets/imagens/gato1.png", height: 60),
                             const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade800,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Text(
-                                "Você está aqui",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
+                            _tag("Você está aqui"),
                           ],
                         ),
                       ),
@@ -98,38 +69,12 @@ class TrilhaUm extends StatelessWidget {
                         ),
                       );
                     },
-                    child: Container(
-                      width: 70,
-                      height: 70,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.black26, width: 2),
-                      ),
-                      child: const Icon(
-                        Icons.star,
-                        color: Colors.yellow,
-                        size: 35,
-                      ),
-                    ),
+                    child: _faseCirculo(true),
                   );
                 }
                 // 🔹 Fase bloqueada
                 else {
-                  icone = Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      color: Colors.grey,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.black26, width: 2),
-                    ),
-                    child: const Icon(
-                      Icons.lock,
-                      color: Colors.white,
-                      size: 35,
-                    ),
-                  );
+                  icone = _faseCirculo(false);
                 }
 
                 return Positioned(
@@ -141,6 +86,37 @@ class TrilhaUm extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _faseCirculo(bool liberada) {
+    return Container(
+      width: 70,
+      height: 70,
+      decoration: BoxDecoration(
+        color: liberada ? Colors.green : Colors.grey,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.black26, width: 2),
+      ),
+      child: Icon(
+        liberada ? Icons.star : Icons.lock,
+        color: liberada ? Colors.yellow : Colors.white,
+        size: 35,
+      ),
+    );
+  }
+
+  Widget _tag(String texto) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.green.shade800,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        texto,
+        style: const TextStyle(color: Colors.white, fontSize: 12),
       ),
     );
   }

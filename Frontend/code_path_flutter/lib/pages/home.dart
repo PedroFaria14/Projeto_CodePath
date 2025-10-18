@@ -46,13 +46,11 @@ class _PaginaHomeState extends State<PaginaHome> {
     }
   }
 
-  /// 🔹 Busca nome e streak do usuário e guarda em estado
+  /// 🔹 Busca nome e streak do usuário
   Future<void> carregarUsuario() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final email = prefs.getString(
-        "userEmail",
-      ); // verifique a chave usada no login
+      final email = prefs.getString("userEmail");
       if (email == null || email.isEmpty) return;
 
       final response = await http.get(
@@ -61,7 +59,6 @@ class _PaginaHomeState extends State<PaginaHome> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
         setState(() {
           streak = data["user"]["streak"] ?? 0;
           nomeUsuario = data["user"]["nome"] ?? "Usuário";
@@ -74,7 +71,7 @@ class _PaginaHomeState extends State<PaginaHome> {
     }
   }
 
-  /// 🔹 Abre trilha de aprendizado (busca fases do usuário e abre a tela)
+  /// 🔹 Abre trilha com as fases do módulo selecionado
   Future<void> abrirTrilha(String tipoModulo) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -88,7 +85,15 @@ class _PaginaHomeState extends State<PaginaHome> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final user = data["user"] ?? data;
-        final fases = List<Map<String, dynamic>>.from(user["fases"] ?? []);
+        final fasesData = user["fases"];
+        List<Map<String, dynamic>> fases = [];
+
+        // 🔹 Compatível com versões antigas e novas
+        if (fasesData is List) {
+          fases = List<Map<String, dynamic>>.from(fasesData);
+        } else if (fasesData is Map && fasesData.containsKey(tipoModulo)) {
+          fases = List<Map<String, dynamic>>.from(fasesData[tipoModulo]);
+        }
 
         Navigator.push(
           context,
@@ -110,6 +115,7 @@ class _PaginaHomeState extends State<PaginaHome> {
     final email = prefs.getString("userEmail");
 
     if (index == 0) {
+      // já está na home
     } else if (index == 1) {
       if (modulos.isNotEmpty) {
         abrirTrilha(modulos.first);
@@ -139,7 +145,6 @@ class _PaginaHomeState extends State<PaginaHome> {
             ),
             Row(
               children: [
-                // 🔥 Streak (dias consecutivos)
                 Row(
                   children: [
                     const Icon(
@@ -154,7 +159,6 @@ class _PaginaHomeState extends State<PaginaHome> {
                   ],
                 ),
                 const SizedBox(width: 12),
-                // ⚙️ Botão de configurações
                 IconButton(
                   icon: const Icon(Icons.settings, color: Colors.white),
                   onPressed: () {
@@ -225,8 +229,6 @@ class _PaginaHomeState extends State<PaginaHome> {
                 ],
               ),
             ),
-
-      /// 🔹 Barra inferior
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
