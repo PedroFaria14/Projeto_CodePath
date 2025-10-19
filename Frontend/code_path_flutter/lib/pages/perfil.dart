@@ -24,7 +24,8 @@ class _PerfilPageState extends State<PerfilPage> {
 
   Future<void> carregarUsuario() async {
     final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString("email") ?? "";
+    // 💥 CORREÇÃO 1: Acesso ao email usando a chave consistente 'userEmail'
+    final email = prefs.getString("userEmail") ?? "";
 
     try {
       final response = await http.get(
@@ -58,6 +59,35 @@ class _PerfilPageState extends State<PerfilPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (carregando) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (usuario == null) {
+      return const Scaffold(body: Center(child: Text("Erro ao carregar perfil")));
+    }
+
+    // 🚀 LÓGICA DE CÁLCULO DE PROGRESSO (para o formato MAPA ANINHADO)
+    // 1. Define o módulo padrão (use a chave exata do seu FastAPI)
+    const String moduloPadrao = "Variáveis"; 
+    
+    // 2. Extrai o MAPA de fases do usuário
+    final Map<String, dynamic> fasesMap = Map<String, dynamic>.from(
+        usuario!["fases"] ?? {},
+    );
+    
+    // 3. Pega a lista de fases desse módulo
+    final List fasesDoModulo = List<Map<String, dynamic>>.from(
+        fasesMap[moduloPadrao] ?? [],
+    );
+    
+    // 4. Faz a contagem (o erro de tipo estava na linha 116)
+    final int liberadas = fasesDoModulo.where((f) => f["liberada"] == true).length;
+    final int total = fasesDoModulo.length;
+    // Se o total for 0 (módulo não existe), previne divisão por zero ou exibição incorreta
+    final String progressoFases = total > 0 ? "$liberadas/$total" : "0/0";
+
+
     return Scaffold(
       backgroundColor: const Color(0xFFDFF5E1),
       appBar: AppBar(
@@ -75,11 +105,8 @@ class _PerfilPageState extends State<PerfilPage> {
           ),
         ],
       ),
-      body: carregando
-          ? const Center(child: CircularProgressIndicator())
-          : usuario == null
-          ? const Center(child: Text("Erro ao carregar perfil"))
-          : SingleChildScrollView(
+      // 💥 CORREÇÃO 2: Estrutura do body simplificada após a verificação de loading/erro
+      body: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
@@ -125,7 +152,7 @@ class _PerfilPageState extends State<PerfilPage> {
                       ),
                       _statCard(
                         "Fases",
-                        "${(usuario!["fases"] as List).where((f) => f["liberada"] == true).length}/5",
+                        progressoFases, // Usa a variável calculada
                         Icons.flag,
                       ),
                     ],

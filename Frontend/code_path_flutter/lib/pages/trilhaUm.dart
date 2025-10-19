@@ -18,6 +18,23 @@ class TrilhaUm extends StatelessWidget {
     ];
 
     return Scaffold(
+      backgroundColor: const Color(0xFFDFF5E1), // Adicione uma cor de fundo se quiser
+      appBar: AppBar( // 🚀 NOVO: Adiciona o AppBar
+        backgroundColor: Colors.green.shade700,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context); // Volta para a tela anterior (PaginaHome)
+          },
+        ),
+        title: Text( // Opcional: Título da Trilha
+          tipoModulo, // Mostra o nome do módulo atual
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
       body: LayoutBuilder(
         builder: (context, constraints) {
           return Stack(
@@ -33,15 +50,15 @@ class TrilhaUm extends StatelessWidget {
                 final fase = entry.value;
                 final pos = posicoes[i % posicoes.length];
 
-                Widget icone;
+                final bool estaLiberada = fase["liberada"] == true || fase["atual"] == true;
+                Widget icone = _faseCirculo(estaLiberada);
 
-                // 🔹 Fase atual
                 if (fase["atual"] == true) {
                   icone = Stack(
                     alignment: Alignment.center,
                     clipBehavior: Clip.none,
                     children: [
-                      _faseCirculo(true),
+                      icone,
                       Positioned(
                         top: -80,
                         child: Column(
@@ -55,28 +72,24 @@ class TrilhaUm extends StatelessWidget {
                     ],
                   );
                 }
-                // 🔹 Fase liberada
-                else if (fase["liberada"] == true) {
+
+                if (estaLiberada) {
                   icone = GestureDetector(
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => QuestaoPage(
+                          builder: (_) => QuestaoPage( 
                             faseId: fase["id"],
                             tipoModulo: tipoModulo,
                           ),
                         ),
                       );
                     },
-                    child: _faseCirculo(true),
+                    child: icone,
                   );
                 }
-                // 🔹 Fase bloqueada
-                else {
-                  icone = _faseCirculo(false);
-                }
-
+                
                 return Positioned(
                   left: constraints.maxWidth * pos.dx - 35,
                   top: constraints.maxHeight * pos.dy - 35,

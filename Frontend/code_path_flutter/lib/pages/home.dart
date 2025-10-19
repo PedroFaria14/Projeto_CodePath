@@ -94,9 +94,10 @@ class _PaginaHomeState extends State<PaginaHome> with RouteAware {
         final fasesData = user["fases"];
         List<Map<String, dynamic>> fases = [];
 
-        if (fasesData is List) {
+       if (fasesData is List) { // Lida com o formato antigo (Lista simples)
           fases = List<Map<String, dynamic>>.from(fasesData);
-        } else if (fasesData is Map && fasesData.containsKey(tipoModulo)) {
+        } else if (fasesData is Map && fasesData.containsKey(tipoModulo)) { 
+          // ⚠️ CORRETO para o MAPA: Pega a lista do módulo específico
           fases = List<Map<String, dynamic>>.from(fasesData[tipoModulo]);
         }
 

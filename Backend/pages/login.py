@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import datetime
-from firebase_config import db
+from firebase_config import db # Certifique-se que este import está correto
+
 router = APIRouter()
 
 # Modelo de dados para login
@@ -15,13 +16,28 @@ class ApiResponse(BaseModel):
     message: str
     user: dict = None
 
-INITIAL_FASES = [
- {"id": 1, "liberada": True, "atual": True},
-{"id": 2, "liberada": False, "atual": False},
- {"id": 3, "liberada": False, "atual": False},
-{"id": 4, "liberada": False, "atual": False},
- {"id": 5, "liberada": False, "atual": False}
-]
+# 💥 ATENÇÃO: Constante de fases padronizada para o MAPA ANINHADO
+# Use o mesmo formato do seu endpoint de /profile
+INITIAL_FASES = {
+    "Laços de Repetição": [
+        {"id": 1, "liberada": True, "atual": True},
+        {"id": 2, "liberada": False, "atual": False},
+        {"id": 3, "liberada": False, "atual": False}
+    ],
+    # Adicione aqui todos os seus módulos, ou apenas o módulo inicial
+    # Se você quiser que o usuário comece sempre pelo mesmo, use só ele.
+    "Condicionais": [
+        {"id": 1, "liberada": True, "atual": True},
+        {"id": 2, "liberada": False, "atual": False},
+        {"id": 3, "liberada": False, "atual": False}
+    ],
+    "Variáveis": [
+        {"id": 1, "liberada": True, "atual": True},
+        {"id": 2, "liberada": False, "atual": False},
+        {"id": 3, "liberada": False, "atual": False}
+    ]
+}
+
 
 @router.post("/login", response_model=ApiResponse)
 async def login_user(user: UserLogin):
@@ -42,7 +58,7 @@ async def login_user(user: UserLogin):
         if user_data['senha'] != user.senha:
             raise HTTPException(status_code=401, detail="Email ou senha incorretos.")
 
-        # --- Lógica do streak ---
+        # --- Lógica do streak (mantida) ---
         today = datetime.date.today()
         last_login = user_data.get('last_login')
         streak = user_data.get('streak', 0)
@@ -57,7 +73,8 @@ async def login_user(user: UserLogin):
             streak = 1
             
         
-        if 'fases' not in user_data:
+        # 💥 CORREÇÃO: Inicializa com o formato de MAPA se não existir
+        if 'fases' not in user_data or not isinstance(user_data['fases'], dict):
             user_doc.reference.update({'fases': INITIAL_FASES})
             user_data['fases'] = INITIAL_FASES
 

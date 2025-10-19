@@ -41,6 +41,8 @@ INITIAL_FASES = {
 }
 
 
+# No arquivo do endpoint /profile (onde INITIAL_FASES é o mapa aninhado)
+
 @router.get("/profile/{email}")
 async def get_profile(email: str):
     try:
@@ -53,11 +55,17 @@ async def get_profile(email: str):
         user_doc = query[0]
         user_data = user_doc.to_dict()
 
-        # 🔹 Garante que cada módulo tenha suas fases
+        # 💥 CORREÇÃO PRINCIPAL DE CONSISTÊNCIA
         fases = user_data.get("fases", {})
-        if not isinstance(fases, dict):
-            fases = {}
+        
+        # Se for o formato antigo (Lista), converte para o formato de Mapa
+        if isinstance(fases, list):
+            # Assumimos que esta lista antiga é o módulo "Variáveis" ou o módulo default
+            fases = {"Variáveis": fases}
+            user_doc.reference.update({"fases": fases})
+            user_data["fases"] = fases
 
+        # Garante que cada módulo PADRÃO tenha suas fases
         atualizou = False
         for modulo, fases_padrao in INITIAL_FASES.items():
             if modulo not in fases:
@@ -68,43 +76,10 @@ async def get_profile(email: str):
             user_doc.reference.update({"fases": fases})
             user_data["fases"] = fases
 
-        return {"user": user_data}
+        # Retorna o user_data no corpo da resposta
+        return {"success": True, "message": "Perfil encontrado.", "user": user_data}
 
     except Exception as e:
         print(f"Erro ao carregar perfil: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao carregar perfil.")
-    
-@router.get("/sincronizar_trilhas")
-async def sincronizar_trilhas():
-    try:
-        users_ref = db.collection("usuarios").stream()
-        usuarios_atualizados = 0
-
-        for user in users_ref:
-            user_data = user.to_dict()
-            fases = user_data.get("fases", {})
-
-            if not isinstance(fases, dict):
-                fases = {}
-
-            atualizou = False
-
-            # 🔹 Garante que todos os módulos existam
-            for modulo, fases_padrao in INITIAL_FASES.items():
-                if modulo not in fases or not isinstance(fases[modulo], list):
-                    fases[modulo] = fases_padrao
-                    atualizou = True
-
-            # 🔹 Atualiza o documento apenas se necessário
-            if atualizou:
-                user.reference.update({"fases": fases})
-                usuarios_atualizados += 1
-
-        return {
-            "success": True,
-            "message": f"Trilhas sincronizadas com sucesso para {usuarios_atualizados} usuários."
-        }
-
-    except Exception as e:
-        print(f"❌ Erro ao sincronizar trilhas: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Retorna a resposta padronizada
+        return ApiResponse(success=False, message="Erro ao carregar perfil.").model_dump()
