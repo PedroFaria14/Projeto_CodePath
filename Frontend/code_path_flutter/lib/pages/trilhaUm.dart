@@ -1,33 +1,28 @@
 import 'package:flutter/material.dart';
 import 'faseUmTrilha1.dart'; // tela da fase (QuestaoPage)
 
+
 class TrilhaUm extends StatelessWidget {
   final String tipoModulo;
   final List fases;
+  final String backgroundAsset; 
+  final List<Offset> posicoes;
+  final String tipoModuloAPI;
+  final String animalAsset;
+  final List<Color> gradientColors;
 
-  const TrilhaUm({super.key, required this.tipoModulo, required this.fases});
+  const TrilhaUm({
+    super.key, 
+    required this.tipoModulo, 
+    required this.fases,
+    required this.backgroundAsset,
+    required this.posicoes,
+    required this.animalAsset,
+    required this.gradientColors,
+    required this.tipoModuloAPI,
+  });
 
-  // 🚀 Função auxiliar para determinar o ícone e a cor
-  Widget _faseCirculo(bool liberada, {bool isCurrent = false}) {
-    return Container(
-      width: 70,
-      height: 70,
-      decoration: BoxDecoration(
-        color: liberada ? Colors.green : Colors.grey,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.black26, width: 2),
-      ),
-      child: Icon(
-        // Se for a fase atual, é uma estrela (clicável, mas é onde ele está)
-        // Se estiver liberada E não for a atual, é uma estrela (já concluída)
-        // Se não estiver liberada (liberada=false), é um cadeado
-        liberada ? Icons.star : Icons.lock, 
-        color: liberada ? Colors.yellow : Colors.white,
-        size: 35,
-      ),
-    );
-  }
-
+  // A função _tag (para o gato) continua igual
   Widget _tag(String texto) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -44,101 +39,144 @@ class TrilhaUm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final posicoes = [
-      const Offset(0.24, 0.165),
-      const Offset(0.60, 0.29),
-      const Offset(0.42, 0.47),
-      const Offset(0.60, 0.64),
-      const Offset(0.45, 0.82),
-    ];
     
-    // 🔍 LÓGICA DE DETECÇÃO: Encontra o índice do nó "atual"
     final int currentNodex = fases.indexWhere((f) => f["atual"] == true);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFDFF5E1), 
+      // 1. 🚀 CORREÇÃO: REMOVEMOS o 'extendBodyBehindAppBar: true'
+      
+      // 2. 🚀 CORREÇÃO: Este é o AppBar novo e correto
       appBar: AppBar( 
-        backgroundColor: Colors.green.shade700,
+        // Botão de voltar branco
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: Colors.white), 
           onPressed: () {
             Navigator.pop(context);
           },
         ),
-        title: Text( 
-          tipoModulo,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+
+        // Título com a imagem do animal
+        title: Row(
+          children: [
+            Image.asset(
+              animalAsset, // Usa a foto do animal
+              height: 40, 
+            ),
+            const SizedBox(width: 10),
+
+            Expanded(
+              child:Text( 
+              tipoModulo,
+              style: const TextStyle(
+                color: Colors.white, // Texto branco
+                fontWeight: FontWeight.bold,
+              ),
+              ),
+            ),
+          ],
+        ),
+        
+        // O degradê (flexibleSpace) vai AQUI DENTRO
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: gradientColors, // Usa as cores do módulo
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
           ),
         ),
       ),
+      // O 'flexibleSpace' que estava aqui fora foi removido.
+      
       body: LayoutBuilder(
         builder: (context, constraints) {
           return Stack(
             children: [
+              // IMAGEM DE FUNDO (Continua igual)
               Positioned.fill(
                 child: Image.asset(
-                  "assets/imagens/fundo1.jpg",
+                  backgroundAsset,
                   fit: BoxFit.cover,
                 ),
               ),
+              
+              // LÓGICA DE ÍCONES (Continua igual)
               ...fases.asMap().entries.map((entry) {
                 final i = entry.key;
                 final fase = entry.value;
-                final pos = posicoes[i % posicoes.length];
+                final pos = posicoes[i % posicoes.length]; 
                 
-                // 🚀 DETERMINAÇÃO DO ESTADO DA FASE
                 final bool isCurrent = i == currentNodex;
                 final bool estaLiberada = fase["liberada"] == true;
                 
-                // Ícone base: Estrela se liberada, Cadeado se bloqueada
-                Widget icone = _faseCirculo(estaLiberada, isCurrent: isCurrent);
+                Widget iconeCentral;
+                Widget? tag;         
 
-                // 1. 💥 SÓ ADICIONA O GATINHO SE FOR O NÓ ATUAL (CORREÇÃO DE FLUXO)
                 if (isCurrent) {
-                  icone = Stack(
-                    alignment: Alignment.center,
-                    clipBehavior: Clip.none,
-                    children: [
-                      icone, // Círculo da fase
-                      Positioned(
-                        top: -80,
-                        child: Column(
-                          children: [
-                            Image.asset("assets/imagens/gato1.png", height: 60),
-                            const SizedBox(height: 6),
-                            _tag("Você está aqui"),
-                          ],
-                        ),
-                      ),
-                    ],
+                  iconeCentral = Image.asset("assets/imagens/gato1.png", height: 60);
+                  tag = Positioned(
+                    top: -30,
+                    child: _tag("Você está aqui"),
                   );
+                } else if (estaLiberada) {
+                  iconeCentral = const Icon(
+                    Icons.star, 
+                    color: Color(0xFFFBC02D),
+                    size: 45,
+                    shadows: [Shadow(color: Colors.black54, blurRadius: 4.0)],
+                  );
+                  tag = null;
+                } else {
+                  iconeCentral = const Icon(
+                    Icons.lock, 
+                    color: Colors.white,
+                    size: 35,
+                    shadows: [Shadow(color: Colors.black54, blurRadius: 4.0)],
+                  );
+                  tag = null;
                 }
 
-                // 2. Torna Clicável se estiver liberada (inclui a fase atual)
-                if (estaLiberada) {
-                  icone = GestureDetector(
-                    onTap: () {
+                // Posiciona o grupo (Ícone + Tag) na tela
+                return Positioned(
+                  left: constraints.maxWidth * pos.dx - 35, 
+                  top: constraints.maxHeight * pos.dy - 35,
+                  
+                  child: GestureDetector(
+                    onTap: estaLiberada ? () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => QuestaoPage( 
                             faseId: fase["id"],
-                            tipoModulo: tipoModulo,
+                            tipoModulo: tipoModuloAPI,     
+                            tipoModuloDisplay: tipoModulo, 
+                            backgroundAsset: backgroundAsset, 
+                            posicoes: posicoes,
+                            
+                            // 3. 🚀 CORREÇÃO: Passando os novos dados
+                            animalAsset: animalAsset,
+                            gradientColors: gradientColors,
                           ),
                         ),
                       );
-                    },
-                    child: icone,
-                  );
-                }
-                
-                // 3. Posiciona o nó na tela
-                return Positioned(
-                  left: constraints.maxWidth * pos.dx - 35,
-                  top: constraints.maxHeight * pos.dy - 35,
-                  child: icone,
+                    } : null,
+                    
+                    // O "alvo" clicável (Continua igual)
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none, 
+                      children: [
+                        Container(
+                          width: 70,
+                          height: 70,
+                          color: Colors.transparent,
+                        ),
+                        iconeCentral,
+                        if (tag != null) tag,
+                      ],
+                    ),
+                  ),
                 );
               }).toList(),
             ],

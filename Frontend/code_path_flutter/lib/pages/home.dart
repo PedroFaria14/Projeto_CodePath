@@ -20,18 +20,126 @@ class _PaginaHomeState extends State<PaginaHome> {
   String nomeUsuario = "Usuário";
   int _selectedIndex = 0;
 
-  // 🚀 MAPA DE TRADUÇÃO: Colocado no topo da classe para garantir o escopo
+
+  final Map<String, String> _cardDisplayNames = {
+    "Variáveis e Tipos de Dados": "Variáveis",
+    "Laços de Repetição": "Laços",
+    // Adicione outros se precisar
+  };
+  
+  // 🚀 NOVO: Mapa para os títulos do AppBar (com quebra de linha)
+  final Map<String, String> _appBarTitles = {
+    "Variáveis e Tipos de Dados": "Variáveis e\nTipos de Dados",
+    "Laços de Repetição": "Laços de\nRepetição",
+    // Adicione outros se precisar
+  };
+
+  // 🚀 MUDANÇA: Agora usamos "gradient" com uma LISTA de cores
+  final Map<String, Map<String, dynamic>> _moduloMetadata = {
+    "Laços de Repetição": {
+      "animal": "assets/imagens/Papagaio.png",
+      // Degradê da sua paleta (Verde escuro -> Verde limão)
+     "gradient": [const Color(0xFF4C7516), const Color(0xFF8EDB29)],
+     "backgroundAsset": "assets/fundos_trilhas/fundo_papagaio.png",
+     "posicoes": [
+        const Offset(0.53, 0.30), // 1º
+        const Offset(0.37, 0.41), // 2º
+        const Offset(0.46, 0.54), // 3º
+        const Offset(0.51, 0.68), // 4º
+        const Offset(0.60, 0.82), // 5º
+        const Offset(0.34, 0.83), // 6º
+      ],
+    },
+    "Condicionais": {
+      "animal": "assets/imagens/Esquilo.png",
+      "backgroundAsset": "assets/fundos_trilhas/fundo_esquilo.png",
+      "posicoes": [
+        const Offset(0.53, 0.30), // 1º
+        const Offset(0.37, 0.41), // 2º
+        const Offset(0.46, 0.54), // 3º
+        const Offset(0.51, 0.68), // 4º
+        const Offset(0.60, 0.82), // 5º
+        const Offset(0.34, 0.83), // 6º
+      ],
+
+"gradient": [const Color(0xFF8D6E63), const Color(0xFFA1887F)],    },
+    "Variáveis e Tipos de Dados": {
+      "animal": "assets/imagens/canguru.png",
+      // Degradê da sua paleta (Ocre -> Dourado vibrante)
+      "gradient": [
+        const Color(0xFF744C00),
+        const Color(0xFFA16800),
+        const Color(0xFFCD8500),
+        const Color(0xFFB77700)
+      ],
+      "stops": [0.0, 0.29, 0.46, 0.86],
+      "backgroundAsset": "assets/fundos_trilhas/fundo_canguru.png",
+      "posicoes": [
+        const Offset(0.55, 0.30), // 1º
+        const Offset(0.39, 0.42), // 2º
+        const Offset(0.48, 0.55), // 3º
+        const Offset(0.533, 0.69), // 4º
+        const Offset(0.63, 0.85), // 5º
+        const Offset(0.34, 0.85), // 6º
+      ],
+
+    },
+    "Funções": {
+      "animal": "assets/imagens/Abelha.png",
+      // Degradê da sua paleta (Amarelo Ouro -> Amarelo vibrante)
+      "gradient": [
+        const Color(0xFFCD8500),
+        const Color(0xFFD9A400),
+        const Color(0xFFE6C200),
+        const Color(0xFFFFFF00)
+      ],
+      // Lista de 'stops' (porcentagens / 100)
+      "stops": [0.07, 0.38, 0.58, 0.87],
+      "backgroundAsset": "assets/fundos_trilhas/fundo_abelha.png",
+      "posicoes": [
+        const Offset(0.55, 0.28), // 1º
+        const Offset(0.38, 0.40), // 2º
+        const Offset(0.48, 0.53), // 3º
+        const Offset(0.53, 0.67), // 4º
+        const Offset(0.62, 0.81), // 5º
+        const Offset(0.34, 0.83), // 6º
+      ],
+
+    },
+    "Perguntas diversas": {
+      "animal": "assets/imagens/cachorro.png",
+    "gradient": [const Color(0xFF616161), const Color(0xFF424242)],
+    "backgroundAsset": "assets/fundos_trilhas/fundo_cachorro.png",
+    "posicoes": [
+        const Offset(0.53, 0.30), // 1º
+        const Offset(0.37, 0.41), // 2º
+        const Offset(0.46, 0.54), // 3º
+        const Offset(0.51, 0.68), // 4º
+        const Offset(0.60, 0.82), // 5º
+        const Offset(0.34, 0.83), // 6º
+      ],
+    },
+  };
+
+  // Fallback também usa degradê
+  final Map<String, dynamic> _defaultInfo = {
+    "animal": "assets/imagens/gato1.png",
+    "gradient": [Colors.green.shade300, Colors.green.shade500],
+    "posicoes": [ const Offset(0.5, 0.5) ],
+  };
+
+  // O resto dos seus métodos (initState, carregarModulos, etc.) 
+  // continua igual.
+  
   Map<String, String> get _moduloNameMap {
     return {
-      
-      "Laços de Repetição": "Laços de Repetição", 
+      "Laços de Repetição": "Laços de Repetição",
       "Funções": "Funções",
-      "Variáveis e Tipos de Dados": "Variáveis e Tipos de Dados", 
+      "Variáveis e Tipos de Dados": "Variáveis e Tipos de Dados",
       "Condicionais": "Condicionais",
-      "Perguntas diversas": "Perguntas diversas", 
+      "Perguntas diversas": "Perguntas diversas",
     };
   }
-
 
   @override
   void initState() {
@@ -45,7 +153,6 @@ class _PaginaHomeState extends State<PaginaHome> {
       final response = await http.get(
         Uri.parse("http://10.0.2.2:8000/modulos"),
       );
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
@@ -64,15 +171,10 @@ class _PaginaHomeState extends State<PaginaHome> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final email = prefs.getString("userEmail");
-
       if (email == null || email.isEmpty) return;
-
-      // Código de mapeamento removido daqui
-      
       final response = await http.get(
         Uri.parse("http://10.0.2.2:8000/profile/$email"),
       );
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
@@ -92,10 +194,18 @@ class _PaginaHomeState extends State<PaginaHome> {
       final prefs = await SharedPreferences.getInstance();
       final email = prefs.getString("userEmail");
       if (email == null) return;
+      
+      final String nomeModuloAPI = _moduloNameMap[tipoModulo] ?? tipoModulo;
 
-      // 1. 🚀 TRADUÇÃO: Usa o mapa para encontrar o nome do API/Firestore
-      final String nomeModuloAPI = _moduloNameMap[tipoModulo] ?? tipoModulo; // 💥 Esta linha agora funciona
+      // 1. 🚀 DEFININDO O 'backgroundAsset'
+      // Precisamos buscar a imagem de fundo aqui
+      final info = _moduloMetadata[tipoModulo] ?? _defaultInfo;
+      final backgroundAsset = info["backgroundAsset"] as String;
+      final posicoes = List<Offset>.from(info["posicoes"]);
 
+      final animalAsset = info["animal"] as String;
+      final gradientColors = info["gradient"] as List<Color>;
+      final appBarTitle = _appBarTitles[tipoModulo] ?? tipoModulo;
       final response = await http.get(
         Uri.parse("http://10.0.2.2:8000/profile/$email"),
       );
@@ -104,39 +214,51 @@ class _PaginaHomeState extends State<PaginaHome> {
         final data = jsonDecode(response.body);
         final user = data["user"] ?? data;
         final fasesData = user["fases"];
+        final Map<String, dynamic> fasesMap =
+            Map<String, dynamic>.from(fasesData ?? {});
         
-        // 2. Extrai as fases usando o NOME DA API
-        final Map<String, dynamic> fasesMap = Map<String, dynamic>.from(fasesData ?? {});
-        List<Map<String, dynamic>> fases = List<Map<String, dynamic>>.from(fasesMap[nomeModuloAPI] ?? []);
-
-        // 🚀 CORREÇÃO PRINCIPAL: Se a lista de fases para o módulo estiver vazia, INICIALIZA
+        // 2. 🚀 DEFININDO 'fases'
+        // Esta é a sua variável 'fases' local. Está correta.
+        List<Map<String, dynamic>> fases =
+            List<Map<String, dynamic>>.from(fasesMap[nomeModuloAPI] ?? []);
+        
         if (fases.isEmpty) {
-             fases = List.generate(
-                5, // Número padrão de fases
-                (i) => {
-                  "id": i + 1,
-                  "liberada": i == 0 ? true : false, // A primeira fase (id=1) é liberada
-                  "atual": i == 0 ? true : false, // O usuário começa na primeira
-                },
-            );
-            
-            // Opcional: Chama o salvar_progresso para persistir esta inicialização
-            final payload = {"email": email, "tipo": nomeModuloAPI, "fases": fases};
-            await http.post(
-              Uri.parse("http://10.0.2.2:8000/salvar_progresso"),
-              headers: {"Content-Type": "application/json"},
-              body: jsonEncode(payload),
-            );
+          fases = List.generate( // Aqui ela é re-atribuída, o que também está correto
+            5,
+            (i) => {
+              "id": i + 1,
+              "liberada": i == 0 ? true : false,
+              "atual": i == 0 ? true : false,
+            },
+          );
+          final payload = {
+            "email": email,
+            "tipo": nomeModuloAPI,
+            "fases": fases
+          };
+          await http.post(
+            Uri.parse("http://10.0.2.2:8000/salvar_progresso"),
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode(payload),
+          );
         }
         
-        // 3. Envia o NOME DA API e a lista de fases (agora garantida) para a TrilhaUm
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => TrilhaUm(tipoModulo: nomeModuloAPI, fases: fases),
+            // 3. 🚀 USANDO AS VARIÁVEIS
+            // Garantindo que 'fases' e 'backgroundAsset' estão sendo passadas
+            builder: (_) => TrilhaUm(
+              tipoModulo: appBarTitle,
+              tipoModuloAPI: nomeModuloAPI,
+              fases: fases, 
+              backgroundAsset: backgroundAsset,
+              posicoes: posicoes,
+              animalAsset: animalAsset,
+              gradientColors: gradientColors,
+            ),
           ),
         );
-
         carregarUsuario();
       } else {
         debugPrint("Erro ao carregar fases do usuário: ${response.body}");
@@ -150,12 +272,9 @@ class _PaginaHomeState extends State<PaginaHome> {
     setState(() => _selectedIndex = index);
     final prefs = await SharedPreferences.getInstance();
     final email = prefs.getString("userEmail");
-
     if (index == 0) {
-      // já está na home
     } else if (index == 1) {
       if (modulos.isNotEmpty) {
-        // Usa o nome do primeiro módulo para abrir a trilha
         abrirTrilha(modulos.first);
       }
     } else if (index == 2) {
@@ -174,12 +293,13 @@ class _PaginaHomeState extends State<PaginaHome> {
     return Scaffold(
       backgroundColor: const Color(0xFFDFF5E1),
       appBar: AppBar(
+        // ... seu AppBar (sem mudanças)
         backgroundColor: Colors.green.shade700,
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              "Olá, $nomeUsuario 👋",
+              "Olá, $nomeUsuario ",
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
@@ -234,19 +354,36 @@ class _PaginaHomeState extends State<PaginaHome> {
                     child: GridView.builder(
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 1.2,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
+                        crossAxisCount: 2,
+                        // 🚀 MUDANÇA: Mudei o aspect ratio para ficar mais "retangular"
+                        // Ajuste esse valor se achar melhor (ex: 1.8 ou 2.0)
+                        childAspectRatio: 1.6, 
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                      ),
                       itemCount: modulos.length,
                       itemBuilder: (context, index) {
                         final modulo = modulos[index];
+                        final info = _moduloMetadata[modulo] ?? _defaultInfo;
+                        final backgroundAsset = info["backgroundAsset"] as String;
+                        final posicoes = List<Offset>.from(info["posicoes"]);
+
+                        final animalAsset = info["animal"] as String;
+                        final gradientColors = info["gradient"] as List<Color>;
+                        final cardDisplayName = _cardDisplayNames[modulo] ?? modulo;
                         return GestureDetector(
                           onTap: () => abrirTrilha(modulo),
                           child: Container(
                             decoration: BoxDecoration(
-                              color: Colors.green.shade200,
+                              // 🚀 MUDANÇA 1: GRADIENTE HORIZONTAL
+                              gradient: LinearGradient(
+                                colors: gradientColors,
+                                begin: Alignment.centerLeft, // Começa na esquerda
+                                end: Alignment.centerRight, // Termina na direita
+                                // (Opcional) Adicione 'stops' se quiser que uma cor
+                                // ocupe mais espaço, como na imagem do canguru.
+                                // Ex: stops: [0.4, 1.0]
+                              ),
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: const [
                                 BoxShadow(
@@ -256,15 +393,46 @@ class _PaginaHomeState extends State<PaginaHome> {
                                 ),
                               ],
                             ),
-                            child: Center(
-                              child: Text(
-                                modulo,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                            
+                            // 🚀 MUDANÇA 2: LAYOUT EM ROW (Linha)
+                            child: Row(
+                              children: [
+                                // 1. Animal na Esquerda
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 12.0),
+                                  child: Image.asset(
+                                    animalAsset,
+                                    height: 50, // Ajuste a altura
+                                    fit: BoxFit.contain,
+                                  ),
                                 ),
-                              ),
+                                
+                                const SizedBox(width: 10), // Espaçador
+
+                              
+                                Expanded(
+                                  child: Text(
+                                    cardDisplayName,
+                                    textAlign: TextAlign.left,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      // 🚀 MUDANÇA 3: COR DO TEXTO
+                                      color: Colors.white,
+                                      // (Opcional) Sombra no texto
+                                      shadows: [
+                                        Shadow(
+                                          blurRadius: 2.0,
+                                          color: Colors.black45,
+                                          offset: Offset(1.0, 1.0),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                // Padding final à direita
+                                const SizedBox(width: 8),
+                              ],
                             ),
                           ),
                         );
@@ -275,6 +443,7 @@ class _PaginaHomeState extends State<PaginaHome> {
               ),
             ),
       bottomNavigationBar: BottomNavigationBar(
+        // ... seu BottomNavigationBar (sem mudanças)
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         selectedItemColor: Colors.green.shade800,
