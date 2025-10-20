@@ -1,3 +1,5 @@
+// Arquivo: faseUmTrilha1.dart (SUBSTITUA O SEU ARQUIVO POR ESTE)
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,7 +9,7 @@ import 'trilhaUm.dart'; // Importa a tela do mapa
 // Variáveis de estado do Quiz
 const int QUIZ_SIZE = 3;
 
-// --- Widget ExplicacaoModal (SEM MUDANÇAS AQUI) ---
+// 🚀 --- INÍCIO DA MODIFICAÇÃO (ExplicacaoModal) --- 🚀
 class ExplicacaoModal extends StatelessWidget {
   final bool acertou;
   final String explicacao;
@@ -15,6 +17,7 @@ class ExplicacaoModal extends StatelessWidget {
   final VoidCallback onClose;
   final bool isLastQuestion;
   final List<Color> gradientColors;
+  final String animalAsset; // Adicionado: asset da imagem do animal
 
   const ExplicacaoModal({
     super.key,
@@ -24,12 +27,12 @@ class ExplicacaoModal extends StatelessWidget {
     required this.onClose,
     this.isLastQuestion = false,
     required this.gradientColors,
+    required this.animalAsset, // Adicionado ao construtor
   });
 
   @override
   Widget build(BuildContext context) {
-    // ... (código do modal continua o mesmo) ...
-     final Color primaryColor = acertou
+    final Color primaryColor = acertou
         ? Colors.green.shade700
         : Colors.red.shade700;
     final Color lightBackground = acertou
@@ -39,7 +42,9 @@ class ExplicacaoModal extends StatelessWidget {
     final String title = acertou
         ? (isLastQuestion ? "Fase Concluída! " : "Resposta Correta! ")
         : "Ops! Resposta Incorreta";
-    final String imageAsset = "assets/imagens/gato1.png"; // Gato padrão para feedback
+
+    // Agora o imageAsset é o animalAsset passado
+    final String imageAssetToDisplay = animalAsset;
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -49,7 +54,11 @@ class ExplicacaoModal extends StatelessWidget {
       title: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: primaryColor,
+          gradient: LinearGradient(
+            colors: gradientColors,
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(20),
             topRight: Radius.circular(20),
@@ -69,7 +78,7 @@ class ExplicacaoModal extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(imageAsset, height: 70),
+            Image.asset(imageAssetToDisplay, height: 70), // Usa o animalAsset
             const SizedBox(height: 15),
             Container(
               padding: const EdgeInsets.all(12),
@@ -88,7 +97,7 @@ class ExplicacaoModal extends StatelessWidget {
             ElevatedButton(
               onPressed: onClose,
               style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor, // Botão verde/vermelho
+                backgroundColor: primaryColor,
                 minimumSize: const Size(double.infinity, 50),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -111,33 +120,16 @@ class ExplicacaoModal extends StatelessWidget {
   }
 }
 // --- Fim do Widget ExplicacaoModal ---
-
-
-// Clipper para a curva (pode ajustar a forma aqui se necessário)
-class BottomCurveClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    var path = Path();
-    path.lineTo(0, size.height - 40); // Começa mais acima
-    // Curva mais larga e suave
-    path.quadraticBezierTo(size.width / 2, size.height + 20, size.width, size.height - 40);
-    path.lineTo(size.width, 0);
-    path.close();
-    return path;
-  }
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
-}
-
+// 🚀 --- FIM DA MODIFICAÇÃO (ExplicacaoModal) --- 🚀
 
 class QuestaoPage extends StatefulWidget {
   final int faseId;
-  final String tipoModulo; // API
-  final String backgroundAsset; // Não usado mais para fundo, mas mantido
-  final List<Offset> posicoes; // Não usado mais para fundo, mas mantido
+  final String tipoModulo; // Este é o nome da API
+  final String backgroundAsset;
+  final List<Offset> posicoes;
   final String animalAsset;
   final List<Color> gradientColors;
-  final String tipoModuloDisplay; // Exibição
+  final String tipoModuloDisplay; // Nome de exibição
 
   const QuestaoPage({
     super.key,
@@ -155,13 +147,14 @@ class QuestaoPage extends StatefulWidget {
 }
 
 class _QuestaoPageState extends State<QuestaoPage> {
-  // ... (Variáveis de estado - sem mudanças) ...
   List<Map<String, dynamic>> quizQuestions = [];
   int currentQuestionIndex = 0;
   int correctAnswers = 0;
+
   String enunciado = "";
   List<String> alternativas = [];
   String idPergunta = "";
+
   bool carregando = true;
   int? alternativaSelecionada;
   bool respostaEnviada = false;
@@ -172,324 +165,476 @@ class _QuestaoPageState extends State<QuestaoPage> {
     carregarNovoQuiz();
   }
 
-  // ... (Funções carregarNovoQuiz, _replaceCurrentQuestion, _fetchQuestions, _loadCurrentQuestion - sem mudanças) ...
-  Future<void> carregarNovoQuiz() async { /* ... */ }
-  Future<void> _replaceCurrentQuestion() async { /* ... */ }
-  Future<void> _fetchQuestions(int count, {bool isReplacement = false}) async { /* ... */ }
-  void _loadCurrentQuestion() { /* ... */ }
+  // --- Funções de carregar e salvar (SEM MUDANÇAS) ---
 
-  // ... (Função salvarProgressoENavegar - sem mudanças) ...
-  Future<void> salvarProgressoENavegar() async { /* ... */ }
+  Future<void> carregarNovoQuiz() async {
+    return _fetchQuestions(QUIZ_SIZE);
+  }
 
-  // ... (Função validarResposta - sem mudanças, exceto o showDialog) ...
+  Future<void> _replaceCurrentQuestion() async {
+    await _fetchQuestions(1, isReplacement: true);
+  }
+
+  Future<void> _fetchQuestions(int count, {bool isReplacement = false}) async {
+    try {
+      setState(() {
+        carregando = true;
+        alternativaSelecionada = null;
+        respostaEnviada = false;
+        if (!isReplacement) {
+          currentQuestionIndex = 0;
+          correctAnswers = 0;
+        }
+      });
+
+      final prefs = await SharedPreferences.getInstance();
+      final nivel = prefs.getString("userNivel") ?? "iniciante";
+
+      final mapaNiveis = {
+        "iniciante": "Facil",
+        "intermediario": "Medio",
+        "avancado": "Dificil",
+      };
+      final nivelFirebase = mapaNiveis[nivel.toLowerCase()] ?? "Facil";
+
+      final response = await http.get(
+        Uri.parse(
+          "http://10.0.2.2:8000/pergunta/?nivel=$nivelFirebase&tipo=${Uri.encodeComponent(widget.tipoModulo)}&count=$count",
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> novasPerguntas = data["perguntas"] ?? [];
+
+        if (novasPerguntas.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Não foi possível carregar mais perguntas."),
+            ),
+          );
+          carregando = false;
+          return;
+        }
+
+        setState(() {
+          if (isReplacement) {
+            quizQuestions[currentQuestionIndex] = Map<String, dynamic>.from(
+              novasPerguntas.first,
+            );
+          } else {
+            quizQuestions = novasPerguntas
+                .map((p) => Map<String, dynamic>.from(p))
+                .toList();
+          }
+          _loadCurrentQuestion();
+          carregando = false;
+        });
+      } else {
+        debugPrint("Erro ao buscar perguntas: ${response.statusCode}");
+        carregando = false;
+      }
+    } catch (e) {
+      debugPrint("Erro: $e");
+      carregando = false;
+    }
+  }
+
+  void _loadCurrentQuestion() {
+    if (quizQuestions.isEmpty || currentQuestionIndex >= quizQuestions.length)
+      return;
+
+    final pergunta = quizQuestions[currentQuestionIndex];
+
+    setState(() {
+      enunciado = pergunta["pergunta"];
+      alternativas = List<String>.from(pergunta["opcoes"]);
+      idPergunta = pergunta["idPergunta"];
+      alternativaSelecionada = null;
+      respostaEnviada = false;
+    });
+  }
+
+  Future<void> salvarProgressoENavegar() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString("userEmail");
+    if (email == null) return;
+
+    final profileResp = await http.get(
+      Uri.parse("http://10.0.2.2:8000/profile/$email"),
+    );
+    final profileData = jsonDecode(profileResp.body);
+    final user = profileData["user"] ?? profileData;
+
+    Map<String, dynamic> fasesMap = Map<String, dynamic>.from(
+      user["fases"] ?? {},
+    );
+    List<Map<String, dynamic>> moduleFases = [];
+    if (fasesMap.containsKey(widget.tipoModulo)) {
+      moduleFases = List<Map<String, dynamic>>.from(
+        fasesMap[widget.tipoModulo],
+      );
+    } else {
+      moduleFases = List.generate(
+        QUIZ_SIZE,
+        (i) => {"id": i + 1, "liberada": i == 0, "atual": i == 0},
+      );
+    }
+
+    int faseCompletadaId = widget.faseId;
+    int proximaFaseId = faseCompletadaId + 1;
+
+    bool trilhaCompletada = proximaFaseId > moduleFases.length;
+
+    for (var fase in moduleFases) {
+      fase["atual"] = false;
+
+      if (fase["id"] == faseCompletadaId) {
+        fase["liberada"] = true;
+      }
+
+      if (fase["id"] == proximaFaseId) {
+        fase["atual"] = true;
+        fase["liberada"] = true;
+      }
+    }
+
+    if (trilhaCompletada) {
+      if (moduleFases.isNotEmpty) {
+        moduleFases.last["atual"] = true;
+      }
+    }
+
+    fasesMap[widget.tipoModulo] = moduleFases;
+
+    final payload = {
+      "email": email,
+      "tipo": widget.tipoModulo,
+      "fases": moduleFases,
+    };
+
+    await http.post(
+      Uri.parse("http://10.0.2.2:8000/salvar_progresso"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode(payload),
+    );
+
+    final response = await http.get(
+      Uri.parse("http://10.0.2.2:8000/profile/$email"),
+    );
+    final data = jsonDecode(response.body);
+    final userNovo = data["user"];
+
+    final Map<String, dynamic> fasesMapNovo = Map<String, dynamic>.from(
+      userNovo["fases"] ?? {},
+    );
+    final List fasesAtualizadas = List<Map<String, dynamic>>.from(
+      fasesMapNovo[widget.tipoModulo] ?? [],
+    );
+
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TrilhaUm(
+          tipoModulo: widget.tipoModuloDisplay,
+          tipoModuloAPI: widget.tipoModulo,
+          fases: fasesAtualizadas,
+          backgroundAsset: widget.backgroundAsset,
+          posicoes: widget.posicoes,
+          animalAsset: widget.animalAsset,
+          gradientColors: widget.gradientColors,
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
   void validarResposta() async {
     if (alternativaSelecionada == null || respostaEnviada) return;
 
-    setState(() => respostaEnviada = true); // Bloqueia o botão
+    setState(() => respostaEnviada = true);
 
     final String respostaSelecionada = alternativas[alternativaSelecionada!];
 
-    late final http.Response response; // Declarado aqui fora para garantir o escopo
-    try {
-      response = await http.post(
-        Uri.parse("http://10.0.2.2:8000/responder"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "idPergunta": idPergunta,
-          "resposta": respostaSelecionada,
-        }),
-      );
+    final response = await http.post(
+      Uri.parse("http://10.0.2.2:8000/responder"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "idPergunta": idPergunta,
+        "resposta": respostaSelecionada,
+      }),
+    );
 
-      if (response.statusCode != 200) {
-        if (!mounted) return; // Checa se o widget ainda está na árvore
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Erro ao validar resposta. Tente novamente."),
-          ),
-        );
-        setState(() => respostaEnviada = false);
-        return;
-      }
-    } catch (e) {
-      if (!mounted) return;
+    if (response.statusCode != 200) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erro de conexão: $e")),
+        const SnackBar(
+          content: Text("Erro ao validar resposta. Tente novamente."),
+        ),
       );
       setState(() => respostaEnviada = false);
       return;
     }
 
-    // --- VARIÁVEIS DECLARADAS AQUI ---
-    // Elas estão no escopo correto da função agora.
-    final Map<String, dynamic> data = jsonDecode(response.body);
+    final data = jsonDecode(response.body);
     final bool correta = data["success"] ?? false;
-    final String explicacao = data["explicacao"] ?? "A explicação não foi retornada.";
+    final String explicacao =
+        data["explicacao"] ?? "A explicação não foi retornada.";
+
     final bool isLast = currentQuestionIndex == quizQuestions.length - 1;
-    // --- FIM DA DECLARAÇÃO ---
 
-    // Checa o 'mounted' ANTES do showDialog
-    if (!mounted) return;
-
-    // 1. Exibir o Modal de Explicação
+    // 🚀 --- INÍCIO DA MODIFICAÇÃO (validarResposta) --- 🚀
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
-        // As variáveis 'correta', 'explicacao', e 'isLast' devem ser visíveis aqui
         return ExplicacaoModal(
           acertou: correta,
           explicacao: explicacao,
           faseId: widget.faseId,
           isLastQuestion: isLast,
           onClose: () {
-            Navigator.pop(dialogContext); // Fecha o modal
+            Navigator.pop(dialogContext);
           },
           gradientColors: widget.gradientColors,
+          animalAsset: widget.animalAsset, // Passa o animalAsset aqui
         );
       },
     );
+    // 🚀 --- FIM DA MODIFICAÇÃO (validarResposta) --- 🚀
 
-    // Checa o 'mounted' DEPOIS do showDialog
-    if (!mounted) return;
-
-    // 2. Processamento do Progresso / Avanço
     if (correta && isLast) {
-      // Condição de SUCESSO: Acertou a última pergunta
       salvarProgressoENavegar();
     } else if (correta && !isLast) {
-      // Acertou, mas tem mais perguntas: avança para a próxima
       setState(() {
         currentQuestionIndex++;
-        _loadCurrentQuestion(); // Carrega os dados da próxima pergunta
+        _loadCurrentQuestion();
       });
     } else {
-      // 💥 Condição de FALHA: Substitui a pergunta atual por uma nova
       _replaceCurrentQuestion();
     }
   }
 
+  // --- Fim das Funções de carregar e salvar ---
 
   @override
   Widget build(BuildContext context) {
     if (carregando || quizQuestions.isEmpty) {
-      // Tela de Loading com o fundo do módulo
-      return Scaffold(
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: widget.gradientColors,
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: const Center(child: CircularProgressIndicator(color: Colors.white)),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final String progressText =
         "Pergunta ${currentQuestionIndex + 1} de ${quizQuestions.length}";
 
-    // Cores principais para estilização
-    final Color corPrincipalEscura = widget.gradientColors.first;
-    final Color corPrincipalClara = widget.gradientColors.length > 1 ? widget.gradientColors.last : widget.gradientColors.first;
-
     return Scaffold(
-      // 🚀 MUDANÇA: Fundo branco padrão, o gradiente vai ficar só na parte de cima
-      backgroundColor: Colors.white,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        // AppBar simples e transparente (como antes)
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: () {},
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: widget.gradientColors,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
-        ],
-      ),
-      body: Column( // 🚀 MUDANÇA: Estrutura principal é uma Column
-        children: [
-          // 1. Parte Superior Colorida com Curva
-          ClipPath(
-            clipper: BottomCurveClipper(),
-            child: Container(
-              height: MediaQuery.of(context).size.height * 0.40, // Altura da seção colorida
-              width: double.infinity,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: widget.gradientColors,
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Cabeçalho FIXO
+              _buildCustomHeader(context),
+
+              // Barra de progresso
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 8.0,
                 ),
-              ),
-              child: SafeArea( // Conteúdo dentro da área segura
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start, // Alinha no topo
                   children: [
-                    const SizedBox(height: 50), // Espaço para o AppBar
-                    // 🚀 MUDANÇA: Tamanho do Animal reduzido
-                    Image.asset(
-                      widget.animalAsset,
-                      height: 80, // Animal menor
-                      fit: BoxFit.contain,
+                    LinearProgressIndicator(
+                      value: (currentQuestionIndex + 1) / quizQuestions.length,
+                      backgroundColor: Colors.white54,
+                      color: Colors.white,
                     ),
-                    const SizedBox(height: 15),
-                    // Progresso
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 40.0), // Padding lateral
-                      child: LinearProgressIndicator(
-                        value: (currentQuestionIndex + 1) / quizQuestions.length,
-                        backgroundColor: Colors.white.withOpacity(0.3),
-                        color: Colors.white,
-                        minHeight: 6,
-                        borderRadius: BorderRadius.circular(3),
+                    const SizedBox(height: 8),
+                    Text(
+                      progressText,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70,
                       ),
                     ),
-                     const SizedBox(height: 8),
-                     Text(
-                       progressText,
-                       style: const TextStyle(fontSize: 14, color: Colors.white70),
-                     ),
                   ],
                 ),
               ),
-            ),
+
+              // Área de quiz ROLÁVEL (agora em um Expanded)
+              _buildQuizBody(),
+
+              // Botão ENVIAR (agora FIXO no fundo)
+              _buildSubmitButton(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Widget para o cabeçalho (Sem o animal)
+  Widget _buildCustomHeader(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 0.0),
+      child: Column(
+        children: [
+          // Botões de Voltar e Config
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+              // Título (visível o tempo todo)
+              Text(
+                widget.tipoModuloDisplay.replaceAll("\n", " "),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings, color: Colors.white),
+                onPressed: () {
+                  debugPrint("Configurações clicadas!");
+                },
+              ),
+            ],
           ),
 
-          // 2. Conteúdo Rolável (Card da Pergunta, Alternativas, Botão)
-          Expanded( // Ocupa o espaço restante
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24.0, 10.0, 24.0, 24.0), // Ajusta padding
-              child: Column(
-                children: [
-                  // Card da Pergunta
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25), // Padding interno
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20), // Mais arredondado
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.3), // Sombra mais suave
-                          blurRadius: 15,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          "Exercício de ${widget.tipoModuloDisplay.replaceAll('\n', ' ')}",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 18, // Ligeiramente menor
-                            fontWeight: FontWeight.bold,
-                            color: corPrincipalEscura,
-                          ),
-                        ),
-                        const SizedBox(height: 15),
-                        Text(
-                          enunciado,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 16, color: Colors.black87, height: 1.4),
-                        ),
-                        // --- Bloco de Código (Estilizado como na referência) ---
-                        if (true) // Adapte a condição
-                         Padding(
-                           padding: const EdgeInsets.only(top: 15.0),
-                           child: Container(
-                             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-                             width: double.infinity,
-                             decoration: BoxDecoration(
-                               color: corPrincipalEscura, // Cor escura do gradiente
-                               borderRadius: BorderRadius.circular(10),
-                             ),
-                             child: Text(
-                               "for i in range(5, 0, -1):\n  print(___)", // Exemplo
-                               style: const TextStyle(
-                                 color: Colors.white, // Texto branco
-                                 fontFamily: 'monospace',
-                                 fontSize: 15,
-                                 height: 1.5,
-                               ),
-                             ),
-                           ),
-                         ),
-                        // --- Fim do Bloco de Código ---
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 25),
+          // ❌ Animal Removido Daqui ❌
 
-                  // Alternativas
-                  ...alternativas.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final texto = entry.value;
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: alternativaSelecionada == index
-                              ? corPrincipalClara.withOpacity(0.95) // Quase opaco selecionado
-                              : Colors.white, // Fundo branco padrão
-                          foregroundColor: corPrincipalEscura, // Texto escuro
-                          minimumSize: const Size(double.infinity, 55),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                             side: BorderSide( // Borda escura sempre visível
-                               color: alternativaSelecionada == index ? corPrincipalEscura : corPrincipalClara,
-                               width: alternativaSelecionada == index ? 2.5 : 1.5,
-                              ),
-                          ),
-                          elevation: alternativaSelecionada == index ? 6 : 3, // Elevação muda
-                           shadowColor: Colors.grey.withOpacity(0.5),
-                        ),
-                        onPressed: respostaEnviada ? null : () {
-                          setState(() => alternativaSelecionada = index);
-                        },
-                        child: Text(
-                          texto,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                        ),
+          // ❌ SizedBox Removido Daqui ❌
+        ],
+      ),
+    );
+  }
+
+  // Widget para o corpo do quiz (rolável)
+  Widget _buildQuizBody() {
+    return Expanded(
+      // Faz esta parte ocupar todo o espaço restante
+      child: SingleChildScrollView(
+        // Adiciona rolagem se o conteúdo for grande
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+          child: Column(
+            children: [
+              // Card da pergunta
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      enunciado,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
-                    );
-                  }),
-                  const SizedBox(height: 30),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
 
-                  // Botão Enviar
-                  ElevatedButton(
-                    onPressed: alternativaSelecionada == null || respostaEnviada ? null : validarResposta,
+              // Alternativas
+              ...alternativas.asMap().entries.map((entry) {
+                final index = entry.key;
+                final texto = entry.value;
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: corPrincipalClara, // Cor clara
-                      padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 16),
+                      backgroundColor: alternativaSelecionada == index
+                          ? Colors.white.withOpacity(0.9)
+                          : Colors.white.withOpacity(0.7),
+                      foregroundColor: Colors.black,
+                      minimumSize: const Size(double.infinity, 50),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
+                        side: alternativaSelecionada == index
+                            ? const BorderSide(color: Colors.white, width: 2)
+                            : BorderSide.none,
                       ),
                       shadowColor: Colors.black.withOpacity(0.3),
-                      elevation: 6,
+                      elevation: 4,
                     ),
+                    onPressed: respostaEnviada
+                        ? null
+                        : () {
+                            setState(() => alternativaSelecionada = index);
+                          },
                     child: Text(
-                      respostaEnviada ? "PROCESSANDO..." : "Enviar",
+                      texto,
+                      textAlign: TextAlign.center,
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white, // Texto branco
                         fontSize: 16,
+                        color: Colors.black87,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20), // Espaço no final
-                ],
-              ),
-            ),
+                );
+              }),
+
+              const SizedBox(
+                height: 20,
+              ), // Adiciona um espaço no final da rolagem
+            ],
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  // WIDGET: Botão Enviar Fixo (Sem mudanças)
+  Widget _buildSubmitButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      child: ElevatedButton(
+        onPressed: alternativaSelecionada == null || respostaEnviada
+            ? null
+            : validarResposta,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 50),
+          padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          shadowColor: Colors.black.withOpacity(0.4),
+          elevation: 6,
+        ),
+        child: Text(
+          respostaEnviada ? "PROCESSANDO..." : "Enviar",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: widget.gradientColors.first,
+          ),
+        ),
       ),
     );
   }
