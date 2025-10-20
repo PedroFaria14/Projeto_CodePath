@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'trilhaUm.dart';
 import 'perfil.dart';
+import 'tela_configuracao.dart';
 
 class PaginaHome extends StatefulWidget {
   const PaginaHome({super.key});
@@ -12,7 +13,8 @@ class PaginaHome extends StatefulWidget {
   State<PaginaHome> createState() => _PaginaHomeState();
 }
 
-class _PaginaHomeState extends State<PaginaHome> with RouteAware {
+// 💥 CORREÇÃO: Removemos 'with RouteAware'
+class _PaginaHomeState extends State<PaginaHome> {
   List<String> modulos = [];
   bool carregando = true;
   int streak = 0;
@@ -26,12 +28,12 @@ class _PaginaHomeState extends State<PaginaHome> with RouteAware {
     carregarUsuario();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // 🔁 Sempre que voltar pra essa rota, atualiza o usuário
-    carregarUsuario();
-  }
+  // 💥 REMOVIDO: didChangeDependencies não é mais necessário
+  // @override
+  // void didChangeDependencies() {
+  //   super.didChangeDependencies();
+  //   carregarUsuario();
+  // }
 
   Future<void> carregarModulos() async {
     try {
@@ -94,19 +96,25 @@ class _PaginaHomeState extends State<PaginaHome> with RouteAware {
         final fasesData = user["fases"];
         List<Map<String, dynamic>> fases = [];
 
-       if (fasesData is List) { // Lida com o formato antigo (Lista simples)
+        if (fasesData is List) {
+          // Lida com o formato antigo (Lista simples)
           fases = List<Map<String, dynamic>>.from(fasesData);
-        } else if (fasesData is Map && fasesData.containsKey(tipoModulo)) { 
-          // ⚠️ CORRETO para o MAPA: Pega a lista do módulo específico
+        } else if (fasesData is Map && fasesData.containsKey(tipoModulo)) {
+          // CORRETO para o MAPA: Pega a lista do módulo específico
           fases = List<Map<String, dynamic>>.from(fasesData[tipoModulo]);
         }
 
-        Navigator.push(
+        // 💥 CORREÇÃO: Usamos 'await' no push para garantir que o código
+        // na PaginaHome possa reagir ao retorno (embora o refresh seja manual).
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => TrilhaUm(tipoModulo: tipoModulo, fases: fases),
           ),
         );
+
+        // 🔄 Atualiza o estado após o retorno da TrilhaUm
+        carregarUsuario();
       } else {
         debugPrint("Erro ao carregar fases do usuário: ${response.body}");
       }
@@ -124,15 +132,16 @@ class _PaginaHomeState extends State<PaginaHome> with RouteAware {
       // já está na home
     } else if (index == 1) {
       if (modulos.isNotEmpty) {
+        // Chamamos abrirTrilha, que já faz o await e o refresh
         abrirTrilha(modulos.first);
       }
     } else if (index == 2) {
       if (email != null) {
+        // 🔄 Faz await e força o refresh manual ao voltar do Perfil
         await Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const PerfilPage()),
         );
-        // 🔁 Ao voltar, atualiza dados
         carregarUsuario();
       }
     }
@@ -149,7 +158,10 @@ class _PaginaHomeState extends State<PaginaHome> with RouteAware {
           children: [
             Text(
               "Olá, $nomeUsuario 👋",
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
             ),
             Row(
               children: [
@@ -170,9 +182,12 @@ class _PaginaHomeState extends State<PaginaHome> with RouteAware {
                 IconButton(
                   icon: const Icon(Icons.settings, color: Colors.white),
                   onPressed: () async {
+                    // 🔄 Faz await e força o refresh manual ao voltar das Configurações
                     await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const PerfilPage()),
+                      MaterialPageRoute(
+                        builder: (_) => const ConfiguracoesPage(),
+                      ),
                     );
                     carregarUsuario();
                   },

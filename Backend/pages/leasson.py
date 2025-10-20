@@ -4,9 +4,12 @@ from pydantic import BaseModel
 from firebase_config import db
 from scripts.gemini import gerar_explicacao
 from google.cloud.firestore_v1.base_query import FieldFilter
+import re 
+import random 
 
 router = APIRouter()
 
+# --- Modelos de Dados ---
 class Pergunta(BaseModel):
     idPergunta: str
     nivel: str
@@ -15,7 +18,6 @@ class Pergunta(BaseModel):
     opcoes: list
     resposta_correta: str
 
-
 class RespostaUsuario(BaseModel):
     idPergunta: str
     resposta: str
@@ -23,20 +25,39 @@ class RespostaUsuario(BaseModel):
 class ApiResponse(BaseModel):
     success: bool
     message: str
-    pergunta: dict | None = None
     explicacao: str | None = None
     
 class ApiResponseQuestions(BaseModel):
     success: bool
     message: str
-    pergunta: dict | None = None
+    perguntas: list[dict] | None = None
     
+# ----------------------------------------------------
 
-#buscar pergunta aleatória por nível
+# 🚀 FUNÇÃO AUXILIAR CORRIGIDA (Resolve o NameError com escopo local)
+async def get_persona_by_tipo(tipo_exercicio: str):
+    # 1. Busca a persona pelo tipo
+    docs = db.collection("personas").where(
+        filter=FieldFilter("tipo", "==", tipo_exercicio)
+    ).limit(1).get() 
+    
+    if docs:
+        return docs[0].to_dict()
+
+    # 2. 💥 CORREÇÃO DE ESCOPO: O FALLBACK_PERSONA agora é definido DENTRO da função
+    FALLBACK_PERSONA = {
+        "nome": "Professor Assistente",
+        "acerto": "Muito bom! Sua resposta está correta. A explicação é:", 
+        "erro": "Ops! Sua resposta está incorreta. Vamos revisar:", 
+        "instrucoes": "Você é um assistente de programação simpático e direto. Use linguagem simples e explique o conceito."
+    }
+    return FALLBACK_PERSONA
+
+
+# buscar pergunta aleatória por nível
 @router.get("/pergunta/", response_model=ApiResponseQuestions)
-async def get_pergunta(nivel: str, tipo: str):
+async def get_pergunta(nivel: str, tipo: str, count: int = 3): # 💥 CORREÇÃO: Recebe 'count'
     try:
-        # Mapeia níveis do app para o Firebase
         mapa_niveis = {
             "iniciante": "Facil",
             "intermediario": "Medio",
@@ -44,13 +65,13 @@ async def get_pergunta(nivel: str, tipo: str):
         }
         nivel = mapa_niveis.get(nivel.lower(), nivel)
 
-        perguntas_ref = (
-            db.collection("perguntas")
-            .where("nivel", "==", nivel)
-            .where("tipo", "==", tipo)
+        perguntas_ref = db.collection("perguntas").where(
+            filter=FieldFilter("nivel", "==", nivel)
+        ).where(
+            filter=FieldFilter("tipo", "==", tipo)
         )
 
-        docs = perguntas_ref.stream()
+        docs = perguntas_ref.get()
         perguntas = [doc.to_dict() for doc in docs]
 
         if not perguntas:
@@ -58,12 +79,23 @@ async def get_pergunta(nivel: str, tipo: str):
                 status_code=404,
                 detail=f"Nenhuma pergunta encontrada para {nivel} e {tipo}"
             )
-
-        pergunta = random.choice(perguntas)
+        
+        # LÓGICA DE QUIZ: Embaralha e pega as 'count' primeiras perguntas
+        random.shuffle(perguntas)
+        
+        num_perguntas = min(count, len(perguntas))
+        perguntas_selecionadas = perguntas[:num_perguntas]
+        
+        if not perguntas_selecionadas:
+             raise HTTPException(
+                status_code=404,
+                detail=f"Nenhuma pergunta encontrada para {nivel} e {tipo}"
+            )
+        
         return ApiResponseQuestions(
             success=True,
-            message="Pergunta encontrada",
-            pergunta=pergunta
+            message=f"{num_perguntas} perguntas encontradas",
+            perguntas=perguntas_selecionadas
         )
     except HTTPException as e:
         raise e
@@ -71,21 +103,14 @@ async def get_pergunta(nivel: str, tipo: str):
         print(f"❌ Erro ao buscar pergunta: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
-# função auxiliar para buscar a persona pelo Modulo/Tipo do exercício
-async def get_persona_by_tipo(tipo_exercicio: str):
-    docs = db.collection("personas").where("tipo", "==", tipo_exercicio).limit(1).stream()
- 
-    for doc in docs:
-        return doc.to_dict() 
- # Se não encontrar uma persona com esse tipo, retorna a persona 'papagaio' como padrão
-    doc_padrao = db.collection("personas").document("erro").get()
-    return doc_padrao.to_dict()
-#  validar resposta 
+# validar resposta 
 @router.post("/responder", response_model=ApiResponse)
 async def responder(resposta: RespostaUsuario):
     try:
-        # 1. Busca a pergunta pelo campo idPergunta (não pelo doc.id)
-        docs = db.collection("perguntas").where("idPergunta", "==", resposta.idPergunta).limit(1).stream()
+        # 1. Busca a pergunta
+        docs = db.collection("perguntas").where(
+            filter=FieldFilter("idPergunta", "==", resposta.idPergunta)
+        ).limit(1).stream()
         doc = next(docs, None)
 
         if not doc:
@@ -100,23 +125,32 @@ async def responder(resposta: RespostaUsuario):
 
         # 3. Valida resposta
         acertou = resposta.resposta == correta
-        explicacao = gerar_explicacao(
-            pergunta["pergunta"], correta, resposta.resposta,
-            acertou=acertou, prompts_persona=prompts_persona
-        )
         
-        explicacao = explicacao.replace('\n', ' ').strip()
+        explicacao = "" # Inicializa a variável
+        try:
+            explicacao = gerar_explicacao(
+                pergunta["pergunta"], correta, resposta.resposta,
+                acertou=acertou, prompts_persona=prompts_persona
+            )
+        except Exception as gemini_e:
+            print(f"⚠️ ERRO CHAVE NO GEMINI: {gemini_e}")
+            explicacao = f"Erro ao gerar explicação. Tópico: {tipo_exercicio}. Verifique os prompts da IA. Detalhe do erro: {gemini_e}"
+        
+        # 4. Remove a formatação Markdown
+        explicacao_limpa = re.sub(r'\*\*|\*', '', explicacao)
+        explicacao_limpa = explicacao_limpa.replace('\n', ' ').strip()
 
         return ApiResponse(
             success=acertou,
             message="Resposta correta 🎉" if acertou else "Resposta incorreta ❌",
-            explicacao=explicacao
+            explicacao=explicacao_limpa
         )
 
     except HTTPException as e:
         raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Erro inesperado no responder: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro interno no servidor: {e}")
     
 @router.get("/modulos")
 async def listar_modulos():
