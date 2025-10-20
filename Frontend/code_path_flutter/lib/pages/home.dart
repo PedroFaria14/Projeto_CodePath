@@ -13,7 +13,6 @@ class PaginaHome extends StatefulWidget {
   State<PaginaHome> createState() => _PaginaHomeState();
 }
 
-// 💥 CORREÇÃO: Removemos 'with RouteAware'
 class _PaginaHomeState extends State<PaginaHome> {
   List<String> modulos = [];
   bool carregando = true;
@@ -21,19 +20,25 @@ class _PaginaHomeState extends State<PaginaHome> {
   String nomeUsuario = "Usuário";
   int _selectedIndex = 0;
 
+  // 🚀 MAPA DE TRADUÇÃO: Colocado no topo da classe para garantir o escopo
+  Map<String, String> get _moduloNameMap {
+    return {
+      
+      "Laços de Repetição": "Laços de Repetição", 
+      "Funções": "Funções",
+      "Variáveis e Tipos de Dados": "Variáveis e Tipos de Dados", 
+      "Condicionais": "Condicionais",
+      "Perguntas diversas": "Perguntas diversas", 
+    };
+  }
+
+
   @override
   void initState() {
     super.initState();
     carregarModulos();
     carregarUsuario();
   }
-
-  // 💥 REMOVIDO: didChangeDependencies não é mais necessário
-  // @override
-  // void didChangeDependencies() {
-  //   super.didChangeDependencies();
-  //   carregarUsuario();
-  // }
 
   Future<void> carregarModulos() async {
     try {
@@ -58,10 +63,12 @@ class _PaginaHomeState extends State<PaginaHome> {
   Future<void> carregarUsuario() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final email = prefs.getString("userEmail"); // ✅ corrigido
+      final email = prefs.getString("userEmail");
 
       if (email == null || email.isEmpty) return;
 
+      // Código de mapeamento removido daqui
+      
       final response = await http.get(
         Uri.parse("http://10.0.2.2:8000/profile/$email"),
       );
@@ -86,6 +93,9 @@ class _PaginaHomeState extends State<PaginaHome> {
       final email = prefs.getString("userEmail");
       if (email == null) return;
 
+      // 1. 🚀 TRADUÇÃO: Usa o mapa para encontrar o nome do API/Firestore
+      final String nomeModuloAPI = _moduloNameMap[tipoModulo] ?? tipoModulo; // 💥 Esta linha agora funciona
+
       final response = await http.get(
         Uri.parse("http://10.0.2.2:8000/profile/$email"),
       );
@@ -94,26 +104,39 @@ class _PaginaHomeState extends State<PaginaHome> {
         final data = jsonDecode(response.body);
         final user = data["user"] ?? data;
         final fasesData = user["fases"];
-        List<Map<String, dynamic>> fases = [];
+        
+        // 2. Extrai as fases usando o NOME DA API
+        final Map<String, dynamic> fasesMap = Map<String, dynamic>.from(fasesData ?? {});
+        List<Map<String, dynamic>> fases = List<Map<String, dynamic>>.from(fasesMap[nomeModuloAPI] ?? []);
 
-        if (fasesData is List) {
-          // Lida com o formato antigo (Lista simples)
-          fases = List<Map<String, dynamic>>.from(fasesData);
-        } else if (fasesData is Map && fasesData.containsKey(tipoModulo)) {
-          // CORRETO para o MAPA: Pega a lista do módulo específico
-          fases = List<Map<String, dynamic>>.from(fasesData[tipoModulo]);
+        // 🚀 CORREÇÃO PRINCIPAL: Se a lista de fases para o módulo estiver vazia, INICIALIZA
+        if (fases.isEmpty) {
+             fases = List.generate(
+                5, // Número padrão de fases
+                (i) => {
+                  "id": i + 1,
+                  "liberada": i == 0 ? true : false, // A primeira fase (id=1) é liberada
+                  "atual": i == 0 ? true : false, // O usuário começa na primeira
+                },
+            );
+            
+            // Opcional: Chama o salvar_progresso para persistir esta inicialização
+            final payload = {"email": email, "tipo": nomeModuloAPI, "fases": fases};
+            await http.post(
+              Uri.parse("http://10.0.2.2:8000/salvar_progresso"),
+              headers: {"Content-Type": "application/json"},
+              body: jsonEncode(payload),
+            );
         }
-
-        // 💥 CORREÇÃO: Usamos 'await' no push para garantir que o código
-        // na PaginaHome possa reagir ao retorno (embora o refresh seja manual).
+        
+        // 3. Envia o NOME DA API e a lista de fases (agora garantida) para a TrilhaUm
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => TrilhaUm(tipoModulo: tipoModulo, fases: fases),
+            builder: (_) => TrilhaUm(tipoModulo: nomeModuloAPI, fases: fases),
           ),
         );
 
-        // 🔄 Atualiza o estado após o retorno da TrilhaUm
         carregarUsuario();
       } else {
         debugPrint("Erro ao carregar fases do usuário: ${response.body}");
@@ -132,12 +155,11 @@ class _PaginaHomeState extends State<PaginaHome> {
       // já está na home
     } else if (index == 1) {
       if (modulos.isNotEmpty) {
-        // Chamamos abrirTrilha, que já faz o await e o refresh
+        // Usa o nome do primeiro módulo para abrir a trilha
         abrirTrilha(modulos.first);
       }
     } else if (index == 2) {
       if (email != null) {
-        // 🔄 Faz await e força o refresh manual ao voltar do Perfil
         await Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const PerfilPage()),
@@ -182,7 +204,6 @@ class _PaginaHomeState extends State<PaginaHome> {
                 IconButton(
                   icon: const Icon(Icons.settings, color: Colors.white),
                   onPressed: () async {
-                    // 🔄 Faz await e força o refresh manual ao voltar das Configurações
                     await Navigator.push(
                       context,
                       MaterialPageRoute(

@@ -7,6 +7,41 @@ class TrilhaUm extends StatelessWidget {
 
   const TrilhaUm({super.key, required this.tipoModulo, required this.fases});
 
+  // 🚀 Função auxiliar para determinar o ícone e a cor
+  Widget _faseCirculo(bool liberada, {bool isCurrent = false}) {
+    return Container(
+      width: 70,
+      height: 70,
+      decoration: BoxDecoration(
+        color: liberada ? Colors.green : Colors.grey,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.black26, width: 2),
+      ),
+      child: Icon(
+        // Se for a fase atual, é uma estrela (clicável, mas é onde ele está)
+        // Se estiver liberada E não for a atual, é uma estrela (já concluída)
+        // Se não estiver liberada (liberada=false), é um cadeado
+        liberada ? Icons.star : Icons.lock, 
+        color: liberada ? Colors.yellow : Colors.white,
+        size: 35,
+      ),
+    );
+  }
+
+  Widget _tag(String texto) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.green.shade800,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        texto,
+        style: const TextStyle(color: Colors.white, fontSize: 12),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final posicoes = [
@@ -16,19 +51,22 @@ class TrilhaUm extends StatelessWidget {
       const Offset(0.60, 0.64),
       const Offset(0.45, 0.82),
     ];
+    
+    // 🔍 LÓGICA DE DETECÇÃO: Encontra o índice do nó "atual"
+    final int currentNodex = fases.indexWhere((f) => f["atual"] == true);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFDFF5E1), // Adicione uma cor de fundo se quiser
-      appBar: AppBar( // 🚀 NOVO: Adiciona o AppBar
+      backgroundColor: const Color(0xFFDFF5E1), 
+      appBar: AppBar( 
         backgroundColor: Colors.green.shade700,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            Navigator.pop(context); // Volta para a tela anterior (PaginaHome)
+            Navigator.pop(context);
           },
         ),
-        title: Text( // Opcional: Título da Trilha
-          tipoModulo, // Mostra o nome do módulo atual
+        title: Text( 
+          tipoModulo,
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -49,16 +87,21 @@ class TrilhaUm extends StatelessWidget {
                 final i = entry.key;
                 final fase = entry.value;
                 final pos = posicoes[i % posicoes.length];
+                
+                // 🚀 DETERMINAÇÃO DO ESTADO DA FASE
+                final bool isCurrent = i == currentNodex;
+                final bool estaLiberada = fase["liberada"] == true;
+                
+                // Ícone base: Estrela se liberada, Cadeado se bloqueada
+                Widget icone = _faseCirculo(estaLiberada, isCurrent: isCurrent);
 
-                final bool estaLiberada = fase["liberada"] == true || fase["atual"] == true;
-                Widget icone = _faseCirculo(estaLiberada);
-
-                if (fase["atual"] == true) {
+                // 1. 💥 SÓ ADICIONA O GATINHO SE FOR O NÓ ATUAL (CORREÇÃO DE FLUXO)
+                if (isCurrent) {
                   icone = Stack(
                     alignment: Alignment.center,
                     clipBehavior: Clip.none,
                     children: [
-                      icone,
+                      icone, // Círculo da fase
                       Positioned(
                         top: -80,
                         child: Column(
@@ -73,6 +116,7 @@ class TrilhaUm extends StatelessWidget {
                   );
                 }
 
+                // 2. Torna Clicável se estiver liberada (inclui a fase atual)
                 if (estaLiberada) {
                   icone = GestureDetector(
                     onTap: () {
@@ -90,6 +134,7 @@ class TrilhaUm extends StatelessWidget {
                   );
                 }
                 
+                // 3. Posiciona o nó na tela
                 return Positioned(
                   left: constraints.maxWidth * pos.dx - 35,
                   top: constraints.maxHeight * pos.dy - 35,
@@ -99,37 +144,6 @@ class TrilhaUm extends StatelessWidget {
             ],
           );
         },
-      ),
-    );
-  }
-
-  Widget _faseCirculo(bool liberada) {
-    return Container(
-      width: 70,
-      height: 70,
-      decoration: BoxDecoration(
-        color: liberada ? Colors.green : Colors.grey,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.black26, width: 2),
-      ),
-      child: Icon(
-        liberada ? Icons.star : Icons.lock,
-        color: liberada ? Colors.yellow : Colors.white,
-        size: 35,
-      ),
-    );
-  }
-
-  Widget _tag(String texto) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.green.shade800,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        texto,
-        style: const TextStyle(color: Colors.white, fontSize: 12),
       ),
     );
   }

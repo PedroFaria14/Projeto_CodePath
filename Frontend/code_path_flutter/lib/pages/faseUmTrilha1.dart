@@ -36,9 +36,9 @@ class ExplicacaoModal extends StatelessWidget {
         : Colors.red.shade100;
 
     final String title = acertou
-        ? (isLastQuestion ? "Fase Concluída! 🎉" : "Resposta Correta! ✅")
+        ? (isLastQuestion ? "Fase Concluída! 🎉" : "Resposta Correta! ")
         // Mensagem quando erra: a pergunta será substituída
-        : "Ops! Substituída por outra! 🔄";
+        : "Ops! Resposta Incorreta";
     final String imageAsset = "assets/imagens/gato1.png";
 
     return AlertDialog(
@@ -247,79 +247,91 @@ class _QuestaoPageState extends State<QuestaoPage> {
 
   // 💥 FUNÇÃO MODIFICADA: Salva progresso e navega (Fluxo de SUCESSO DO QUIZ)
   Future<void> salvarProgressoENavegar() async {
-    final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString("userEmail");
-    if (email == null) return;
-
-    // Busca perfil para obter o estado atual de todas as fases
-    final profileResp = await http.get(
-      Uri.parse("http://10.0.2.2:8000/profile/$email"),
-    );
-    final profileData = jsonDecode(profileResp.body);
-    final user = profileData["user"] ?? profileData;
-
-    // Montagem do payload com o formato Mapa Aninhado (corrigido)
-    Map<String, dynamic> fasesMap = Map<String, dynamic>.from(
-      user["fases"] ?? {},
-    );
-    List<Map<String, dynamic>> moduleFases = [];
-    if (fasesMap.containsKey(widget.tipoModulo)) {
-      moduleFases = List<Map<String, dynamic>>.from(
-        fasesMap[widget.tipoModulo],
-      );
-    } else {
+  // 1. Lógica de salvar progresso (adaptada para o novo fluxo)
+  final prefs = await SharedPreferences.getInstance();
+  final email = prefs.getString("userEmail");
+  if (email == null) return;
+  
+  // Busca perfil para obter o estado atual de todas as fases
+  final profileResp = await http.get(Uri.parse("http://10.0.2.2:8000/profile/$email"));
+  final profileData = jsonDecode(profileResp.body);
+  final user = profileData["user"] ?? profileData;
+  
+  // Montagem do payload com o formato Mapa Aninhado (corrigido)
+  Map<String, dynamic> fasesMap = Map<String, dynamic>.from(user["fases"] ?? {});
+  List<Map<String, dynamic>> moduleFases = [];
+  if (fasesMap.containsKey(widget.tipoModulo)) {
+      moduleFases = List<Map<String, dynamic>>.from(fasesMap[widget.tipoModulo]);
+  } else {
+      // Fallback
       moduleFases = List.generate(
         QUIZ_SIZE,
         (i) => {"id": i + 1, "liberada": i == 0, "atual": i == 0},
       );
-    }
-
-    // 4) Atualiza o módulo atual (faseAtual = widget.faseId)
-    for (var fase in moduleFases) {
-      // Avança para a próxima fase
-      fase["atual"] = fase["id"] == (widget.faseId + 1);
-      fase["liberada"] =
-          fase["liberada"] == true || fase["id"] == (widget.faseId + 1);
-    }
-    fasesMap[widget.tipoModulo] = moduleFases;
-
-    // O payload deve enviar APENAS a lista do módulo que o backend espera
-    final payload = {
-      "email": email,
-      "tipo": widget.tipoModulo,
-      "fases": moduleFases,
-    };
-
-    await http.post(
-      Uri.parse("http://10.0.2.2:8000/salvar_progresso"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode(payload),
-    );
-
-    // 2. Navegação de volta para o mapa (TrilhaUm)
-    final response = await http.get(
-      Uri.parse("http://10.0.2.2:8000/profile/$email"),
-    );
-    final data = jsonDecode(response.body);
-    final userNovo = data["user"];
-
-    final Map<String, dynamic> fasesMapNovo = Map<String, dynamic>.from(
-      userNovo["fases"] ?? {},
-    );
-    final List fasesAtualizadas = List<Map<String, dynamic>>.from(
-      fasesMapNovo[widget.tipoModulo] ?? [],
-    );
-
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            TrilhaUm(tipoModulo: widget.tipoModulo, fases: fasesAtualizadas),
-      ),
-      (route) => false,
-    );
   }
+  
+  // 4) Atualiza o módulo atual (faseAtual = widget.faseId)
+  int faseCompletadaId = widget.faseId;
+  int proximaFaseId = faseCompletadaId + 1;
+  
+  // Condição para verificar se a próxima fase é a última da lista
+  bool trilhaCompletada = proximaFaseId > moduleFases.length;
+  
+  for (var fase in moduleFases) {
+    // 1. Limpa o status 'atual' em todos os nós
+    fase["atual"] = false;
+
+    // 2. Garante que a fase recém-completada seja marcada como liberada (estrela)
+    if (fase["id"] == faseCompletadaId) {
+        fase["liberada"] = true; 
+    }
+    
+    // 3. 🚀 MARCA O PRÓXIMO NÓ COMO ATUAL E LIBERADO
+    if (fase["id"] == proximaFaseId) {
+        fase["atual"] = true; 
+        fase["liberada"] = true; // Deve ser liberada para ser clicável
+    }
+  }
+
+  // 🚀 CORREÇÃO PRINCIPAL: Se a trilha for completada, marca o ÚLTIMO nó como ATUAL
+  if (trilhaCompletada) {
+      if (moduleFases.isNotEmpty) {
+          // O gatinho deve ficar no último nó que o usuário completou
+          moduleFases.last["atual"] = true; 
+      }
+  }
+
+  fasesMap[widget.tipoModulo] = moduleFases;
+  
+  // O payload deve enviar APENAS a lista do módulo que o backend espera
+  final payload = {"email": email, "tipo": widget.tipoModulo, "fases": moduleFases};
+
+  await http.post(
+    Uri.parse("http://10.0.2.2:8000/salvar_progresso"),
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode(payload),
+  );
+  
+  // 2. Navegação de volta para o mapa (TrilhaUm)
+  final response = await http.get(Uri.parse("http://10.0.2.2:8000/profile/$email"));
+  final data = jsonDecode(response.body);
+  final userNovo = data["user"];
+
+  final Map<String, dynamic> fasesMapNovo = Map<String, dynamic>.from(userNovo["fases"] ?? {});
+  final List fasesAtualizadas = List<Map<String, dynamic>>.from(fasesMapNovo[widget.tipoModulo] ?? []);
+  
+  if (!mounted) return;
+  Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(
+      builder: (_) => TrilhaUm(
+        tipoModulo: widget.tipoModulo,
+        fases: fasesAtualizadas,
+      ),
+    ),
+    (route) => false,
+  );
+}
 
   // 💥 FUNÇÃO MODIFICADA: Gerencia a submissão, modal e progresso/avanço
   void validarResposta() async {
