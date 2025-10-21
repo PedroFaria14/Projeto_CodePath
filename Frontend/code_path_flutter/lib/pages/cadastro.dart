@@ -1,6 +1,9 @@
+// Arquivo: cadastro.dart (SUBSTITUA O SEU POR ESTE)
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart'; // Importe o pacote intl
 import 'login.dart';
 
 class Cadastro extends StatefulWidget {
@@ -11,34 +14,95 @@ class Cadastro extends StatefulWidget {
 }
 
 class _CadastroState extends State<Cadastro> {
-  //controladores de digitação
-
+  // Controladores de digitação
   final TextEditingController nomeController = TextEditingController();
-  final TextEditingController idadeController = TextEditingController();
+  // 🚀 NOVO: Controlador para data de nascimento
+  final TextEditingController dataNascimentoController =
+      TextEditingController();
   final TextEditingController telefoneController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController senhaController = TextEditingController();
+  // 🚀 NOVO: Controlador para confirmar senha
+  final TextEditingController confirmarSenhaController =
+      TextEditingController();
 
   bool isLoading = false;
+  // 🚀 NOVO: Variáveis de estado para visibilidade da senha
+  bool _senhaVisivel = false;
+  bool _confirmarSenhaVisivel = false;
+
+  // 🚀 NOVO: Função para mostrar o DatePicker
+  Future<void> _selecionarData(BuildContext context) async {
+    final DateTime? dataSelecionada = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().subtract(
+        const Duration(days: 365 * 18),
+      ), // Sugere 18 anos atrás
+      firstDate: DateTime(1920), // Data mínima
+      lastDate: DateTime.now(), // Data máxima (hoje)
+      locale: const Locale(
+        'pt',
+        'BR',
+      ), // Opcional: para calendário em português
+    );
+
+    if (dataSelecionada != null) {
+      // Formata a data para YYYY-MM-DD
+      final String dataFormatada = DateFormat(
+        'yyyy-MM-dd',
+      ).format(dataSelecionada);
+      setState(() {
+        dataNascimentoController.text = dataFormatada;
+      });
+    }
+  }
 
   Future<void> cadastrarUsuario() async {
+    // --- Validações no Frontend ---
+    if (nomeController.text.trim().isEmpty ||
+        dataNascimentoController.text.trim().isEmpty ||
+        telefoneController.text.trim().isEmpty ||
+        emailController.text.trim().isEmpty ||
+        senhaController.text.trim().isEmpty ||
+        confirmarSenhaController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("⚠️ Por favor, preencha todos os campos."),
+        ),
+      );
+      return;
+    }
+
+    // 🚀 NOVO: Validação de confirmação de senha
+    if (senhaController.text != confirmarSenhaController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("⚠️ As senhas não coincidem!")),
+      );
+      return; // Impede o envio para a API
+    }
+    // --- Fim das Validações ---
+
     setState(() => isLoading = true);
 
     try {
-      final url = Uri.parse("http://10.0.2.2:8000/register"); // emulador
+      final url = Uri.parse("http://10.0.2.2:8000/register"); // Seu endpoint
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "nome": nomeController.text.trim(),
-          "idade": int.tryParse(idadeController.text.trim()) ?? 0,
+          // 🚀 ALTERADO: Envia 'data_nascimento' em vez de 'idade'
+          "data_nascimento": dataNascimentoController.text
+              .trim(), // Já está formatada
           "telefone": telefoneController.text.trim(),
           "email": emailController.text.trim(),
-          "senha": senhaController.text.trim(),
+          "senha": senhaController.text
+              .trim(), // Envia apenas a senha principal
         }),
       );
 
-      print("Resposta da API: ${response.statusCode} - ${response.body}");
+      // Tratamento da resposta (sem alterações na lógica principal)
+      if (!mounted) return; // Verifica se o widget ainda está montado
 
       final data = jsonDecode(response.body);
 
@@ -46,30 +110,37 @@ class _CadastroState extends State<Cadastro> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("✅ Cadastro realizado com sucesso!")),
         );
-
+        // Navega para Login substituindo a tela atual
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const Login()),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data["message"] ?? "Erro ao cadastrar")),
-        );
+        // Tenta pegar a mensagem de detalhe do HTTPException do FastAPI
+        String errorMessage =
+            data["detail"] ??
+            data["message"] ??
+            "Erro desconhecido ao cadastrar";
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("❌ $errorMessage")));
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Erro de conexão: $e")));
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
-
-    setState(() => isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF90EE90),
-      extendBodyBehindAppBar: true,
+      // Seu fundo gradiente (sem alterações)
       body: Container(
         decoration: const BoxDecoration(
           gradient: RadialGradient(
@@ -79,102 +150,197 @@ class _CadastroState extends State<Cadastro> {
             stops: [0.2, 0.6, 1.0],
           ),
         ),
-
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: SingleChildScrollView(
+              // Permite rolar se o teclado aparecer
               child: Column(
+                mainAxisAlignment:
+                    MainAxisAlignment.center, // Centraliza verticalmente
                 children: [
+                  // Logo e Título (sem alterações)
                   Image.asset(
                     "assets/imagens/gato.png",
-                    height: 150,
-                    width: 150,
-                  ),
-                  const SizedBox(height: 30),
+                    height: 120,
+                    width: 120,
+                  ), // Ajustei levemente o tamanho
+                  const SizedBox(height: 20),
                   const Text(
                     "Crie sua conta",
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
-
                   const SizedBox(height: 30),
+
+                  // --- Campos de Texto Atualizados ---
+
+                  // Nome de Usuário
                   TextField(
                     controller: nomeController,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: const Color(0xFF2C2C54),
-                      labelText: "Nome de usuário",
-                      labelStyle: const TextStyle(color: Colors.white70),
+                      // 🚀 ALTERADO: labelText -> hintText
+                      hintText: "Nome de usuário",
+                      hintStyle: const TextStyle(color: Colors.white70),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 15,
+                      ), // Ajuste padding
                     ),
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 20), // Espaçamento ajustado
+                  // 🚀 ALTERADO: Campo Idade para Data de Nascimento
                   TextField(
-                    controller: idadeController,
+                    controller: dataNascimentoController,
                     style: const TextStyle(color: Colors.white),
+                    readOnly: true, // Impede digitação direta
+                    onTap: () => _selecionarData(context), // Chama o DatePicker
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: const Color(0xFF2C2C54),
-                      labelText: "Idade",
-                      labelStyle: const TextStyle(color: Colors.white70),
+                      hintText: "Data de Nascimento (AAAA-MM-DD)",
+                      hintStyle: const TextStyle(color: Colors.white70),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 15,
+                      ),
+                      // Adiciona ícone de calendário
+                      suffixIcon: const Icon(
+                        Icons.calendar_today,
+                        color: Colors.white70,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 20),
+
+                  // Telefone
                   TextField(
                     controller: telefoneController,
                     style: const TextStyle(color: Colors.white),
+                    keyboardType:
+                        TextInputType.phone, // Define teclado numérico
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: const Color(0xFF2C2C54),
-                      labelText: "Telefone",
-                      labelStyle: const TextStyle(color: Colors.white70),
+                      hintText: "Telefone",
+                      hintStyle: const TextStyle(color: Colors.white70),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 15,
+                      ),
                     ),
                   ),
+                  const SizedBox(height: 20),
 
-                  const SizedBox(height: 30),
+                  // Email
                   TextField(
                     controller: emailController,
                     style: const TextStyle(color: Colors.white),
+                    keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: const Color(0xFF2C2C54),
-                      labelText: "Email",
-                      labelStyle: const TextStyle(color: Colors.white70),
+                      hintText: "Email",
+                      hintStyle: const TextStyle(color: Colors.white70),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 15,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 20),
+
+                  // Senha
                   TextField(
                     controller: senhaController,
                     style: const TextStyle(color: Colors.white),
+                    // 🚀 ALTERADO: obscureText usa a variável de estado
+                    obscureText: !_senhaVisivel,
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: const Color(0xFF2C2C54),
-                      labelText: "Senha",
-                      labelStyle: const TextStyle(color: Colors.white70),
+                      hintText: "Senha",
+                      hintStyle: const TextStyle(color: Colors.white70),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 15,
+                      ),
+                      // 🚀 NOVO: Ícone de visibilidade
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _senhaVisivel
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                          color: Colors.white70,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _senhaVisivel = !_senhaVisivel;
+                          });
+                        },
+                      ),
                     ),
                   ),
+                  const SizedBox(height: 20),
 
+                  // 🚀 NOVO: Campo Confirmar Senha
+                  TextField(
+                    controller: confirmarSenhaController,
+                    style: const TextStyle(color: Colors.white),
+                    obscureText: !_confirmarSenhaVisivel,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: const Color(0xFF2C2C54),
+                      hintText: "Confirmar Senha",
+                      hintStyle: const TextStyle(color: Colors.white70),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 15,
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _confirmarSenhaVisivel
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                          color: Colors.white70,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _confirmarSenhaVisivel = !_confirmarSenhaVisivel;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 30),
+
+                  // Botão Confirmar
                   ElevatedButton(
                     onPressed: isLoading ? null : cadastrarUsuario,
                     style: ElevatedButton.styleFrom(
@@ -184,19 +350,30 @@ class _CadastroState extends State<Cadastro> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      "CONFIRMAR",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
+                    child: isLoading
+                        ? const SizedBox(
+                            // Indicador de progresso menor
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            "CONFIRMAR",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
+                          ), // Texto em branco
                   ),
-
                   const SizedBox(height: 15),
 
+                  // Link para Login (sem alterações)
                   TextButton(
-                    onPressed: () => Navigator.push(
+                    onPressed: () => Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(builder: (context) => const Login()),
                     ),
@@ -217,6 +394,7 @@ class _CadastroState extends State<Cadastro> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 20), // Espaço extra no final
                 ],
               ),
             ),
@@ -224,5 +402,17 @@ class _CadastroState extends State<Cadastro> {
         ),
       ),
     );
+  }
+
+  // Limpa os controladores quando o widget é descartado
+  @override
+  void dispose() {
+    nomeController.dispose();
+    dataNascimentoController.dispose();
+    telefoneController.dispose();
+    emailController.dispose();
+    senhaController.dispose();
+    confirmarSenhaController.dispose();
+    super.dispose();
   }
 }
