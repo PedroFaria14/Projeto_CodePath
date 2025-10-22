@@ -3,23 +3,21 @@ from pydantic import BaseModel, Field, EmailStr
 import datetime
 import re
 from firebase_config import db
+from google.cloud.firestore_v1 import FieldFilter  # ✅ Import necessário
 
 router = APIRouter()
 
-# Modelo de dados para registro
 class UserRegister(BaseModel):
     nome: str = Field(..., min_length=2)
     email: EmailStr
     senha: str = Field(..., min_length=6)
-    idade: int = Field(..., gt=0)
-    telefone: str = Field(..., min_length=10, max_length=17)  # string para permitir +, espaços e parênteses
+    data_nascimento: datetime.date = Field(...)  # formato YYYY-MM-DD
+    telefone: str = Field(..., min_length=10, max_length=17)
 
-# Modelo de resposta
 class ApiResponse(BaseModel):
     success: bool
     message: str
 
-# Fases iniciais padrão
 INITIAL_FASES = [
     {"id": 1, "liberada": True, "atual": True},
     {"id": 2, "liberada": False, "atual": False},
@@ -30,10 +28,8 @@ INITIAL_FASES = [
 
 @router.post("/register", response_model=ApiResponse)
 async def register_user(user: UserRegister):
-    # 🧼 Limpar telefone (manter apenas dígitos)
     telefone_limpo = re.sub(r'\D', '', user.telefone)
 
-    # 📞 Validar quantidade de dígitos
     if len(telefone_limpo) < 10 or len(telefone_limpo) > 13:
         raise HTTPException(
             status_code=400,
@@ -46,21 +42,24 @@ async def register_user(user: UserRegister):
     try:
         users_ref = db.collection('usuarios')
 
-        # Verifica se o email já existe
-        query = users_ref.where('email', '==', user.email).limit(1).get()
-        if len(query) > 0:
+        # ✅ Versão nova e correta do filtro
+        query = users_ref.where(filter=FieldFilter('email', '==', user.email)).limit(1).stream()
+        existing_users = list(query)
+
+        if len(existing_users) > 0:
             raise HTTPException(status_code=400, detail="Este email já está cadastrado.")
 
-        # 🔐 (Opcional) hash da senha
-        # from bcrypt import hashpw, gensalt
-        # hashed_senha = hashpw(user.senha.encode('utf-8'), gensalt()).decode('utf-8')
+        # ✅ Converter date → datetime
+        data_nasc_datetime = datetime.datetime.combine(
+            user.data_nascimento, datetime.datetime.min.time()
+        )
 
         user_data = {
             "nome": user.nome,
-            "idade": user.idade,
-            "telefone": telefone_limpo,  # salvo apenas números
+            "data_nascimento": data_nasc_datetime,
+            "telefone": telefone_limpo,
             "email": user.email,
-            "senha": user.senha,  # troque por hashed_senha se for usar bcrypt
+            "senha": user.senha,
             "streak": 1,
             "last_login": datetime.datetime.utcnow(),
             "nivel": "iniciante",
@@ -71,9 +70,8 @@ async def register_user(user: UserRegister):
 
         return {"success": True, "message": "Usuário cadastrado com sucesso!"}
 
-    except HTTPException:
-        raise
-
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         print(f"❌ Erro ao registrar o usuário: {e}")
         raise HTTPException(status_code=500, detail="Ocorreu um erro no servidor. Tente novamente mais tarde.")
