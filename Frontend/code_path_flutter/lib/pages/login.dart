@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'cadastro.dart';
 import 'home.dart';
@@ -12,16 +13,44 @@ class Login extends StatefulWidget {
   State<Login> createState() => _LoginState();
 }
 
-class _LoginState extends State<Login> {
+class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController senhaController = TextEditingController();
   bool isLoading = false;
+  bool obscurePassword = true; // 👁️ controla se a senha está visível
+
+  // Controle da animação do gato
+  late AnimationController _catController;
+  late Animation<double> _rotation;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _catController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
+
+    _rotation = Tween<double>(begin: -0.03, end: 0.03)
+        .animate(CurvedAnimation(parent: _catController, curve: Curves.easeInOut));
+
+    _scale = Tween<double>(begin: 1.0, end: 1.08)
+        .animate(CurvedAnimation(parent: _catController, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _catController.dispose();
+    super.dispose();
+  }
 
   Future<void> loginUser() async {
     setState(() => isLoading = true);
 
     try {
-      final url = Uri.parse("http://10.0.2.2:8000/login"); // emulador Android
+      final url = Uri.parse("http://localhost:8000/login");
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
@@ -34,18 +63,13 @@ class _LoginState extends State<Login> {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data["success"] == true) {
-        // 🎯 PASSO 1: Salvar o e-mail no SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString("userEmail", emailController.text.trim());
-        // O 'userEmail' é a chave que você usa na PaginaHome para buscar o perfil.
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Login realizado com sucesso!")),
         );
 
-        // 🎯 PASSO 2: Usar pushReplacement
-        // Isso substitui a tela de Login pela Home, impedindo que o usuário volte
-        // para a tela de Login com o botão "voltar" do celular.
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const PaginaHome()),
@@ -56,162 +80,257 @@ class _LoginState extends State<Login> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Erro de conexão: $e")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Erro de conexão: $e")));
     }
 
     setState(() => isLoading = false);
   }
 
-  /*INICIO DA CONFIGURAÇÃO DE TELA*/
+  /*===============================
+      INTERFACE MODERNA E ORGÂNICA
+  ===============================*/
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
+      body: AnimatedContainer(
+        duration: const Duration(seconds: 4),
+        curve: Curves.easeInOut,
         decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.topCenter,
-            radius: 1.2,
-            colors: [Color(0xFFE0F8E0), Color(0xFFB2F7C1), Color(0xFF90EE90)],
-            stops: [0.2, 0.6, 1.0],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFA8E6CF),
+              Color(0xFFDCEDC1),
+              Color(0xFFFFF3B0),
+              Color(0xFFFFD3B6),
+            ],
           ),
         ),
-
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SizedBox(height: 20),
-                Center(
-                  child: Column(
-                    children: [
-                      Image.asset(
-                        "assets/imagens/gato.png",
-                        height: 150,
-                        width: 150,
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        "BEM VINDO DE VOLTA",
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // 🐱 GATO ANIMADO
+                  AnimatedBuilder(
+                    animation: _catController,
+                    builder: (context, child) {
+                      return Transform.rotate(
+                        angle: _rotation.value,
+                        child: Transform.scale(
+                          scale: _scale.value,
+                          child: child,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 30),
-                TextField(
-                  controller: emailController,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: const Color(0xFF262840),
-                    hintText: 'E-mail',
-                    hintStyle: const TextStyle(color: Colors.white70),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                      );
+                    },
+                    child: Image.asset(
+                      "assets/imagens/gato.png",
+                      height: 150,
+                      width: 150,
                     ),
                   ),
-                  style: const TextStyle(color: Colors.white),
-                ),
+                  const SizedBox(height: 25),
 
-                const SizedBox(height: 20),
-                TextField(
-                  controller: senhaController,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: const Color(0xFF262840),
-                    hintText: 'Senha',
-                    hintStyle: const TextStyle(color: Colors.white70),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                  const Text(
+                    "Bem-vindo de volta!",
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF2E2E2E),
                     ),
                   ),
-                  style: const TextStyle(color: Colors.white),
-                ),
+                  const SizedBox(height: 40),
 
-                const SizedBox(height: 30),
-                SizedBox(
-                  width: double.infinity,
-                  child: Container(
-                    child: ElevatedButton(
-                      onPressed: isLoading ? null : loginUser,
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 50),
-                        backgroundColor: const Color(0xFF3CB371),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  // 🔹 Container translúcido que agrupa os campos e o botão
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.25),
+                          borderRadius: BorderRadius.circular(25),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.4),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 15,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
                         ),
-                        elevation: 0,
-                      ),
+                        child: Column(
+                          children: [
+                            _buildTextField(
+                              controller: emailController,
+                              hint: "E-mail",
+                              icon: Icons.email_outlined,
+                            ),
+                            const SizedBox(height: 20),
 
-                      child: isLoading
-                          ? const CircularProgressIndicator()
-                          : const Text(
-                              "CONFIRMAR",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Color.fromARGB(255, 255, 255, 255),
+                            // Campo de senha com ícone de olho 👁️
+                            _buildPasswordField(),
+
+                            const SizedBox(height: 35),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeInOut,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.15),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: isLoading ? null : loginUser,
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  backgroundColor: const Color(0xFF3CB371),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: isLoading
+                                    ? const SizedBox(
+                                        width: 28,
+                                        height: 28,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 3,
+                                        ),
+                                      )
+                                    : const Text(
+                                        "Entrar",
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          letterSpacing: 1.2,
+                                        ),
+                                      ),
                               ),
                             ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 15),
-
-                TextButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const Cadastro()),
-                  ),
-                  child: const Text.rich(
-                    TextSpan(
-                      text: 'Não tem conta? ',
-                      style: TextStyle(color: Colors.black, fontSize: 14),
-                      children: [
-                        TextSpan(
-                          text: 'Crie uma',
-                          style: TextStyle(
-                            color: Color(0xFF3CB371),
-                            fontWeight: FontWeight.bold,
-                            decoration: TextDecoration.underline,
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: 25),
+                  TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const Cadastro()),
+                    ),
+                    child: const Text.rich(
+                      TextSpan(
+                        text: 'Ainda não tem conta? ',
+                        style: TextStyle(color: Colors.black87, fontSize: 15),
+                        children: [
+                          TextSpan(
+                            text: 'Crie uma',
+                            style: TextStyle(
+                              color: Color(0xFF3CB371),
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 🔹 Campo de texto normal (e-mail)
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hint,
+    bool obscure = false,
+    IconData? icon,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF262840),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            offset: const Offset(0, 3),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscure,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          prefixIcon: Icon(icon, color: Colors.white70),
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.white54),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+      ),
+    );
+  }
+
+  // 🔹 Campo de senha com botão de visibilidade 👁️
+  Widget _buildPasswordField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF262840),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            offset: const Offset(0, 3),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: senhaController,
+        obscureText: obscurePassword,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
+          hintText: "Senha",
+          hintStyle: const TextStyle(color: Colors.white54),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+          suffixIcon: IconButton(
+            icon: Icon(
+              obscurePassword ? Icons.visibility_off : Icons.visibility,
+              color: Colors.white70,
+            ),
+            onPressed: () {
+              setState(() {
+                obscurePassword = !obscurePassword;
+              });
+            },
           ),
         ),
       ),

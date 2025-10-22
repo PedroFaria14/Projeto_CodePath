@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'home.dart';
 import 'login.dart';
 
 class Cadastro extends StatefulWidget {
@@ -11,45 +14,49 @@ class Cadastro extends StatefulWidget {
 }
 
 class _CadastroState extends State<Cadastro> {
-  //controladores de digitação
-
   final TextEditingController nomeController = TextEditingController();
-  final TextEditingController idadeController = TextEditingController();
-  final TextEditingController telefoneController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController senhaController = TextEditingController();
-
+  final TextEditingController confirmarSenhaController = TextEditingController();
   bool isLoading = false;
+  bool obscureSenha = true;
+  bool obscureConfirmarSenha = true;
 
   Future<void> cadastrarUsuario() async {
+    if (senhaController.text != confirmarSenhaController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("As senhas não coincidem")),
+      );
+      return;
+    }
+
     setState(() => isLoading = true);
 
     try {
-      final url = Uri.parse("http://10.0.2.2:8000/register"); // emulador
+      final url = Uri.parse("http://localhost:8000/cadastro");
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "nome": nomeController.text.trim(),
-          "idade": int.tryParse(idadeController.text.trim()) ?? 0,
-          "telefone": telefoneController.text.trim(),
           "email": emailController.text.trim(),
           "senha": senhaController.text.trim(),
         }),
       );
 
-      print("Resposta da API: ${response.statusCode} - ${response.body}");
-
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data["success"] == true) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString("userEmail", emailController.text.trim());
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("✅ Cadastro realizado com sucesso!")),
+          const SnackBar(content: Text("Cadastro realizado com sucesso!")),
         );
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const Login()),
+          MaterialPageRoute(builder: (_) => const PaginaHome()),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -57,156 +64,184 @@ class _CadastroState extends State<Cadastro> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Erro de conexão: $e")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Erro de conexão: $e")));
     }
 
     setState(() => isLoading = false);
   }
 
+  /*===============================
+      INTERFACE MODERNA E ORGÂNICA
+  ===============================*/
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF90EE90),
-      extendBodyBehindAppBar: true,
-      body: Container(
+      body: AnimatedContainer(
+        duration: const Duration(seconds: 4),
+        curve: Curves.easeInOut,
         decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.topCenter,
-            radius: 1.2,
-            colors: [Color(0xFFE0F8E0), Color(0xFFB2F7C1), Color(0xFF90EE90)],
-            stops: [0.2, 0.6, 1.0],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFA8E6CF),
+              Color(0xFFDCEDC1),
+              Color(0xFFFFF3B0),
+              Color(0xFFFFD3B6),
+            ],
           ),
         ),
-
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
+          child: Center(
             child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset(
                     "assets/imagens/gato.png",
-                    height: 150,
-                    width: 150,
+                    height: 120,
+                    width: 120,
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 20),
+
                   const Text(
                     "Crie sua conta",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF2E2E2E),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+
+                  // 🔹 Container translúcido com campos dentro
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.25),
+                          borderRadius: BorderRadius.circular(25),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.4),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 15,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            _buildTextField(
+                              controller: nomeController,
+                              hint: "Nome completo",
+                              icon: Icons.person_outline,
+                            ),
+                            const SizedBox(height: 20),
+
+                            _buildTextField(
+                              controller: emailController,
+                              hint: "E-mail",
+                              icon: Icons.email_outlined,
+                            ),
+                            const SizedBox(height: 20),
+
+                            _buildPasswordField(
+                              controller: senhaController,
+                              hint: "Senha",
+                              obscure: obscureSenha,
+                              onToggleVisibility: () {
+                                setState(() {
+                                  obscureSenha = !obscureSenha;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 20),
+
+                            _buildPasswordField(
+                              controller: confirmarSenhaController,
+                              hint: "Confirmar senha",
+                              obscure: obscureConfirmarSenha,
+                              onToggleVisibility: () {
+                                setState(() {
+                                  obscureConfirmarSenha = !obscureConfirmarSenha;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 35),
+
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeInOut,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.15),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: isLoading ? null : cadastrarUsuario,
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  backgroundColor: const Color(0xFF3CB371),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: isLoading
+                                    ? const SizedBox(
+                                        width: 28,
+                                        height: 28,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 3,
+                                        ),
+                                      )
+                                    : const Text(
+                                        "Cadastrar",
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          letterSpacing: 1.2,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
 
-                  const SizedBox(height: 30),
-                  TextField(
-                    controller: nomeController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFF2C2C54),
-                      labelText: "Nome de usuário",
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  TextField(
-                    controller: idadeController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFF2C2C54),
-                      labelText: "Idade",
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  TextField(
-                    controller: telefoneController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFF2C2C54),
-                      labelText: "Telefone",
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-                  TextField(
-                    controller: emailController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFF2C2C54),
-                      labelText: "Email",
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  TextField(
-                    controller: senhaController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFF2C2C54),
-                      labelText: "Senha",
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-                  ElevatedButton(
-                    onPressed: isLoading ? null : cadastrarUsuario,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF3CB371),
-                      minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      "CONFIRMAR",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 15),
-
+                  const SizedBox(height: 25),
                   TextButton(
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const Login()),
+                      MaterialPageRoute(builder: (_) => const Login()),
                     ),
                     child: const Text.rich(
                       TextSpan(
-                        text: 'Já tem conta? ',
-                        style: TextStyle(color: Colors.black, fontSize: 14),
+                        text: 'Já tem uma conta? ',
+                        style: TextStyle(color: Colors.black87, fontSize: 15),
                         children: [
                           TextSpan(
-                            text: 'Entre',
+                            text: 'Faça login',
                             style: TextStyle(
                               color: Color(0xFF3CB371),
                               fontWeight: FontWeight.bold,
@@ -220,6 +255,79 @@ class _CadastroState extends State<Cadastro> {
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 🔹 Campo de texto normal
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hint,
+    IconData? icon,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF262840),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            offset: const Offset(0, 3),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          prefixIcon: Icon(icon, color: Colors.white70),
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.white54),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+      ),
+    );
+  }
+
+  // 🔹 Campo de senha com ícone de olho 👁️
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String hint,
+    required bool obscure,
+    required VoidCallback onToggleVisibility,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF262840),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            offset: const Offset(0, 3),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscure,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.white54),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+          suffixIcon: IconButton(
+            icon: Icon(
+              obscure ? Icons.visibility_off : Icons.visibility,
+              color: Colors.white70,
+            ),
+            onPressed: onToggleVisibility,
           ),
         ),
       ),

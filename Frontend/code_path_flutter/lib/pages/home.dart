@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'trilhaUm.dart';
-import 'perfil.dart';
-import 'tela_configuracao.dart';
+import 'trilhaUm.dart'; // Certifique-se de que este arquivo existe
+import 'perfil.dart'; // Certifique-se de que este arquivo existe
+import 'tela_configuracao.dart'; // Certifique-se de que este arquivo existe
 
 class PaginaHome extends StatefulWidget {
   const PaginaHome({super.key});
@@ -20,6 +20,11 @@ class _PaginaHomeState extends State<PaginaHome> {
   String nomeUsuario = "Usuário";
   int _selectedIndex = 0;
 
+  
+  late PageController _pageController;
+  
+  double _currentPage = 0.0; 
+  
 
   final Map<String, String> _cardDisplayNames = {
     "Variáveis e Tipos de Dados": "Variáveis",
@@ -27,19 +32,19 @@ class _PaginaHomeState extends State<PaginaHome> {
     // Adicione outros se precisar
   };
   
-  // 🚀 NOVO: Mapa para os títulos do AppBar (com quebra de linha)
+  
   final Map<String, String> _appBarTitles = {
     "Variáveis e Tipos de Dados": "Variáveis e\nTipos de Dados",
     "Laços de Repetição": "Laços de\nRepetição",
     // Adicione outros se precisar
   };
 
-  // 🚀 MUDANÇA: Agora usamos "gradient" com uma LISTA de cores
+  
   final Map<String, Map<String, dynamic>> _moduloMetadata = {
     "Laços de Repetição": {
       "animal": "assets/imagens/Papagaio.png",
       // Degradê da sua paleta (Verde escuro -> Verde limão)
-     "gradient": [const Color(0xFF4C7516), const Color(0xFF8EDB29)],
+     "gradient": [const Color.fromARGB(255, 165, 220, 94), const Color.fromARGB(255, 45, 162, 82)],
      "backgroundAsset": "assets/fundos_trilhas/fundo_papagaio.png",
      "posicoes": [
         const Offset(0.53, 0.30), // 1º
@@ -54,7 +59,7 @@ class _PaginaHomeState extends State<PaginaHome> {
       "animal": "assets/imagens/Esquilo.png",
       "backgroundAsset": "assets/fundos_trilhas/fundo_esquilo.png",
       "posicoes": [
-        const Offset(0.53, 0.30), // 1º
+        const Offset(0.93, 0.30), // 1º
         const Offset(0.37, 0.41), // 2º
         const Offset(0.46, 0.54), // 3º
         const Offset(0.51, 0.68), // 4º
@@ -62,15 +67,16 @@ class _PaginaHomeState extends State<PaginaHome> {
         const Offset(0.34, 0.83), // 6º
       ],
 
-"gradient": [const Color(0xFF8D6E63), const Color(0xFFA1887F)],    },
+      "gradient": [const Color.fromARGB(255, 207, 149, 131), const Color.fromARGB(255, 248, 101, 16)],    
+    },
     "Variáveis e Tipos de Dados": {
       "animal": "assets/imagens/canguru.png",
       // Degradê da sua paleta (Ocre -> Dourado vibrante)
       "gradient": [
-        const Color(0xFF744C00),
-        const Color(0xFFA16800),
-        const Color(0xFFCD8500),
-        const Color(0xFFB77700)
+        const Color.fromARGB(255, 250, 184, 61),
+        const Color.fromARGB(255, 191, 148, 70),
+        const Color.fromARGB(255, 163, 74, 50),
+        const Color.fromARGB(255, 73, 47, 15)
       ],
       "stops": [0.0, 0.29, 0.46, 0.86],
       "backgroundAsset": "assets/fundos_trilhas/fundo_canguru.png",
@@ -88,10 +94,10 @@ class _PaginaHomeState extends State<PaginaHome> {
       "animal": "assets/imagens/Abelha.png",
       // Degradê da sua paleta (Amarelo Ouro -> Amarelo vibrante)
       "gradient": [
-        const Color(0xFFCD8500),
+        const Color.fromARGB(255, 212, 134, 10),
         const Color(0xFFD9A400),
         const Color(0xFFE6C200),
-        const Color(0xFFFFFF00)
+        const Color(0xFFFFCC00) // Cor original era FFFF00, mudei para FFCC00 (mais suave)
       ],
       // Lista de 'stops' (porcentagens / 100)
       "stops": [0.07, 0.38, 0.58, 0.87],
@@ -124,13 +130,53 @@ class _PaginaHomeState extends State<PaginaHome> {
   // Fallback também usa degradê
   final Map<String, dynamic> _defaultInfo = {
     "animal": "assets/imagens/gato1.png",
-    "gradient": [Colors.green.shade300, Colors.green.shade500],
+    "gradient": [Colors.grey.shade600, Colors.grey.shade800], // Degradê neutro
     "posicoes": [ const Offset(0.5, 0.5) ],
   };
-
-  // O resto dos seus métodos (initState, carregarModulos, etc.) 
-  // continua igual.
   
+  Color get _startColor {
+    if (modulos.isEmpty) return _defaultInfo["gradient"][0];
+    final startModuloIndex = _currentPage.floor();
+    final endModuloIndex = (_currentPage + 1).floor().clamp(0, modulos.length - 1);
+    
+    // Calcula a cor inicial do degradê atual
+    final startModulo = modulos[startModuloIndex];
+    final startInfo = _moduloMetadata[startModulo] ?? _defaultInfo;
+    final startColor = startInfo["gradient"][0] as Color;
+    
+    // Calcula a cor inicial do degradê seguinte (para a transição)
+    if (startModuloIndex == endModuloIndex) return startColor;
+    
+    final endModulo = modulos[endModuloIndex];
+    final endInfo = _moduloMetadata[endModulo] ?? _defaultInfo;
+    final endColor = endInfo["gradient"][0] as Color;
+    
+    final t = _currentPage - startModuloIndex; // 0.0 a 1.0
+    return Color.lerp(startColor, endColor, t) ?? startColor;
+  }
+  
+  Color get _endColor {
+    if (modulos.isEmpty) return _defaultInfo["gradient"].last;
+    final startModuloIndex = _currentPage.floor();
+    final endModuloIndex = (_currentPage + 1).floor().clamp(0, modulos.length - 1);
+    
+    // Calcula a cor final do degradê atual
+    final startModulo = modulos[startModuloIndex];
+    final startInfo = _moduloMetadata[startModulo] ?? _defaultInfo;
+    final startColor = startInfo["gradient"].last as Color; // Pega a última cor
+    
+    // Calcula a cor final do degradê seguinte (para a transição)
+    if (startModuloIndex == endModuloIndex) return startColor;
+    
+    final endModulo = modulos[endModuloIndex];
+    final endInfo = _moduloMetadata[endModulo] ?? _defaultInfo;
+    final endColor = endInfo["gradient"].last as Color; // Pega a última cor
+    
+    final t = _currentPage - startModuloIndex; // 0.0 a 1.0
+    return Color.lerp(startColor, endColor, t) ?? startColor;
+  }
+  
+
   Map<String, String> get _moduloNameMap {
     return {
       "Laços de Repetição": "Laços de Repetição",
@@ -144,14 +190,28 @@ class _PaginaHomeState extends State<PaginaHome> {
   @override
   void initState() {
     super.initState();
+    
+    _pageController = PageController(viewportFraction: 0.85); // 85% da tela para o card
+    _pageController.addListener(() {
+      setState(() {
+        _currentPage = _pageController.page ?? 0.0;
+      });
+    });
+    
     carregarModulos();
     carregarUsuario();
   }
 
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+  
   Future<void> carregarModulos() async {
     try {
       final response = await http.get(
-        Uri.parse("http://10.0.2.2:8000/modulos"),
+        Uri.parse("http://127.0.0.1:8000/modulos"),
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -173,7 +233,7 @@ class _PaginaHomeState extends State<PaginaHome> {
       final email = prefs.getString("userEmail");
       if (email == null || email.isEmpty) return;
       final response = await http.get(
-        Uri.parse("http://10.0.2.2:8000/profile/$email"),
+        Uri.parse("http://127.0.0.1:8000/profile/$email"),
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -197,7 +257,6 @@ class _PaginaHomeState extends State<PaginaHome> {
       
       final String nomeModuloAPI = _moduloNameMap[tipoModulo] ?? tipoModulo;
 
-      // 1. 🚀 DEFININDO O 'backgroundAsset'
       // Precisamos buscar a imagem de fundo aqui
       final info = _moduloMetadata[tipoModulo] ?? _defaultInfo;
       final backgroundAsset = info["backgroundAsset"] as String;
@@ -207,7 +266,7 @@ class _PaginaHomeState extends State<PaginaHome> {
       final gradientColors = info["gradient"] as List<Color>;
       final appBarTitle = _appBarTitles[tipoModulo] ?? tipoModulo;
       final response = await http.get(
-        Uri.parse("http://10.0.2.2:8000/profile/$email"),
+        Uri.parse("http://127.0.0.1:8000/profile/$email"),
       );
 
       if (response.statusCode == 200) {
@@ -217,7 +276,7 @@ class _PaginaHomeState extends State<PaginaHome> {
         final Map<String, dynamic> fasesMap =
             Map<String, dynamic>.from(fasesData ?? {});
         
-        // 2. 🚀 DEFININDO 'fases'
+        
         // Esta é a sua variável 'fases' local. Está correta.
         List<Map<String, dynamic>> fases =
             List<Map<String, dynamic>>.from(fasesMap[nomeModuloAPI] ?? []);
@@ -237,7 +296,7 @@ class _PaginaHomeState extends State<PaginaHome> {
             "fases": fases
           };
           await http.post(
-            Uri.parse("http://10.0.2.2:8000/salvar_progresso"),
+            Uri.parse("http://127.0.0.1:8000/salvar_progresso"),
             headers: {"Content-Type": "application/json"},
             body: jsonEncode(payload),
           );
@@ -246,7 +305,7 @@ class _PaginaHomeState extends State<PaginaHome> {
         await Navigator.push(
           context,
           MaterialPageRoute(
-            // 3. 🚀 USANDO AS VARIÁVEIS
+            
             // Garantindo que 'fases' e 'backgroundAsset' estão sendo passadas
             builder: (_) => TrilhaUm(
               tipoModulo: appBarTitle,
@@ -274,8 +333,11 @@ class _PaginaHomeState extends State<PaginaHome> {
     final email = prefs.getString("userEmail");
     if (index == 0) {
     } else if (index == 1) {
+      
       if (modulos.isNotEmpty) {
-        abrirTrilha(modulos.first);
+        // Encontra o módulo central (ou o mais próximo)
+        final moduloIndex = _currentPage.round().clamp(0, modulos.length - 1);
+        abrirTrilha(modulos[moduloIndex]);
       }
     } else if (index == 2) {
       if (email != null) {
@@ -291,164 +353,359 @@ class _PaginaHomeState extends State<PaginaHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFDFF5E1),
-      appBar: AppBar(
-        // ... seu AppBar (sem mudanças)
-        backgroundColor: Colors.green.shade700,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              "Olá, $nomeUsuario ",
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            Row(
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.local_fire_department,
-                      color: Colors.orangeAccent,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      "$streak",
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-                IconButton(
-                  icon: const Icon(Icons.settings, color: Colors.white),
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ConfiguracoesPage(),
-                      ),
-                    );
-                    carregarUsuario();
-                  },
-                ),
-              ],
-            ),
-          ],
+      
+      body: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        // O degradê do fundo transiciona entre as cores inicial e final do card
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_startColor.withOpacity(0.9), Colors.white], // Transição suave para o branco na parte inferior
+          ),
         ),
-      ),
-      body: carregando
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: carregando
+            ? const Center(child: CircularProgressIndicator(color: Colors.white))
+            : Column(
                 children: [
-                  const Text(
-                    "Trilhas disponíveis",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: GridView.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        // 🚀 MUDANÇA: Mudei o aspect ratio para ficar mais "retangular"
-                        // Ajuste esse valor se achar melhor (ex: 1.8 ou 2.0)
-                        childAspectRatio: 1.6, 
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                      ),
-                      itemCount: modulos.length,
-                      itemBuilder: (context, index) {
-                        final modulo = modulos[index];
-                        final info = _moduloMetadata[modulo] ?? _defaultInfo;
-                        final backgroundAsset = info["backgroundAsset"] as String;
-                        final posicoes = List<Offset>.from(info["posicoes"]);
-
-                        final animalAsset = info["animal"] as String;
-                        final gradientColors = info["gradient"] as List<Color>;
-                        final cardDisplayName = _cardDisplayNames[modulo] ?? modulo;
-                        return GestureDetector(
-                          onTap: () => abrirTrilha(modulo),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              // 🚀 MUDANÇA 1: GRADIENTE HORIZONTAL
-                              gradient: LinearGradient(
-                                colors: gradientColors,
-                                begin: Alignment.centerLeft, // Começa na esquerda
-                                end: Alignment.centerRight, // Termina na direita
-                                // (Opcional) Adicione 'stops' se quiser que uma cor
-                                // ocupe mais espaço, como na imagem do canguru.
-                                // Ex: stops: [0.4, 1.0]
+                  
+                  Padding(
+                    padding: EdgeInsets.only(
+                      top: MediaQuery.of(context).padding.top + 16, // Ajuste para a barra de status
+                      left: 20,
+                      right: 20,
+                      bottom: 16,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            
+                            Text(
+                              "Olá, $nomeUsuario",
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                shadows: [
+                                  Shadow(color: Colors.black38, blurRadius: 2.0, offset: Offset(1, 1))
+                                ],
                               ),
-                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            
+                            Row(
+                              children: [
+                                // Streak
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.white54)
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.local_fire_department,
+                                        color: Colors.orangeAccent,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        "$streak",
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                // Configurações
+                                IconButton(
+                                  icon: const Icon(Icons.settings, color: Colors.white, size: 28),
+                                  onPressed: () async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const ConfiguracoesPage(),
+                                      ),
+                                    );
+                                    carregarUsuario();
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          "Selecione sua trilha de aprendizado",
+                          style: TextStyle(
+                            fontSize: 18, 
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w500
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  
+                  Expanded(
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          height: 320, // Altura para os cards
+                          child: PageView.builder(
+                            controller: _pageController,
+                            itemCount: modulos.length,
+                            itemBuilder: (context, index) {
+                              final modulo = modulos[index];
+                              final info = _moduloMetadata[modulo] ?? _defaultInfo;
+                              final gradientColors = info["gradient"] as List<Color>;
+                              final animalAsset = info["animal"] as String;
+                              final cardDisplayName = _cardDisplayNames[modulo] ?? modulo;
+                              
+                              
+                              double scale = 1.0;
+                              if (_pageController.position.haveDimensions) {
+                                scale = (_pageController.page! - index).abs();
+                                scale = 1.0 - (scale * 0.2); // Reduz o tamanho em até 20%
+                              }
+                              
+                              return AnimatedBuilder(
+                                animation: _pageController,
+                                builder: (context, child) {
+                                  return Transform.scale(
+                                    scale: scale,
+                                    child: GestureDetector(
+                                      onTap: () => abrirTrilha(modulo),
+                                      child: Container(
+                                        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: gradientColors,
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          ),
+                                          borderRadius: BorderRadius.circular(20),
+                                          boxShadow: const [
+                                            BoxShadow(
+                                              color: Colors.black38,
+                                              blurRadius: 10,
+                                              offset: Offset(0, 5),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Stack(
+                                          children: [
+                                            
+                                            Padding(
+                                              padding: const EdgeInsets.all(20.0),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    cardDisplayName,
+                                                    style: const TextStyle(
+                                                      fontSize: 30,
+                                                      fontWeight: FontWeight.w900,
+                                                      color: Colors.white,
+                                                      shadows: [
+                                                        Shadow(color: Colors.black45, blurRadius: 4.0)
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  // Texto secundário (exemplo)
+                                                  const Text(
+                                                    "Aprenda os conceitos básicos de programação.",
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      color: Colors.white70,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            
+                                            Positioned(
+                                              bottom: -20, // Um pouco para fora para dar profundidade
+                                              right: -20,
+                                              child: Image.asset(
+                                                animalAsset,
+                                                height: 180, 
+                                                fit: BoxFit.contain,
+                                              ),
+                                            ),
+                                            
+                                            Positioned(
+                                              bottom: 20,
+                                              left: 20,
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius: BorderRadius.circular(30),
+                                                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)]
+                                                ),
+                                                child: Row(
+                                                  children: const [
+                                                    Icon(Icons.play_arrow_rounded, color: Colors.green, size: 28),
+                                                    SizedBox(width: 4),
+                                                    Text(
+                                                      "INICIAR",
+                                                      style: TextStyle(
+                                                        color: Colors.green,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        
+                        
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            modulos.length,
+                            (index) {
+                              double normalizedPage = _currentPage.clamp(0.0, modulos.length - 1.0);
+                              double distance = (normalizedPage - index).abs();
+                              // Calcula o tamanho do dot baseado na proximidade
+                              double size = (10 + (10 * (1 - distance.clamp(0.0, 1.0)))); 
+                              
+                              return AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                                height: 8.0,
+                                width: size.clamp(8, 18),
+                                decoration: BoxDecoration(
+                                  color: distance < 0.5 ? Colors.white : Colors.white54,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+                        
+                        
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                          child: Container(
+                            height: 80,
+                            padding: const EdgeInsets.all(16.0),
+                            decoration: BoxDecoration(
+                              // Degradê Monocromático (Cinza escuro para mais escuro)
+                              gradient: LinearGradient(
+                                colors: [
+                                  const Color.fromARGB(255, 247, 129, 241),
+                                  const Color.fromARGB(255, 36, 165, 167)
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(15),
                               boxShadow: const [
                                 BoxShadow(
                                   color: Colors.black26,
-                                  blurRadius: 4,
-                                  offset: Offset(2, 2),
+                                  blurRadius: 5,
+                                  offset: Offset(0, 3),
                                 ),
                               ],
                             ),
-                            
-                            // 🚀 MUDANÇA 2: LAYOUT EM ROW (Linha)
                             child: Row(
-                              children: [
-                                // 1. Animal na Esquerda
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 12.0),
-                                  child: Image.asset(
-                                    animalAsset,
-                                    height: 50, // Ajuste a altura
-                                    fit: BoxFit.contain,
+                              children: [                            
+                                const Icon(
+                                  Icons.emoji_events,
+                                  color: Colors.amber, // Cor de destaque para o ícone
+                                  size: 32,
+                                ),
+                                const SizedBox(width: 15),
+                                // Título e Subtítulo
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      Text(
+                                        "Desafios Semanais",
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      Text(
+                                        "Em breve",
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white70,
+                                          fontStyle: FontStyle.italic
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                                 
-                                const SizedBox(width: 10), // Espaçador
-
-                              
-                                Expanded(
-                                  child: Text(
-                                    cardDisplayName,
-                                    textAlign: TextAlign.left,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      // 🚀 MUDANÇA 3: COR DO TEXTO
-                                      color: Colors.white,
-                                      // (Opcional) Sombra no texto
-                                      shadows: [
-                                        Shadow(
-                                          blurRadius: 2.0,
-                                          color: Colors.black45,
-                                          offset: Offset(1.0, 1.0),
+                                // Botão "INICIAR" Desabilitado
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade500.withOpacity(0.5), // Cor para indicar desabilitado
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.lock, color: Colors.grey.shade300, size: 20),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        "INICIAR",
+                                        style: TextStyle(
+                                          color: Colors.grey.shade300,
+                                          fontWeight: FontWeight.bold,
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                // Padding final à direita
-                                const SizedBox(width: 8),
                               ],
                             ),
                           ),
-                        );
-                      },
+                        ),
+                        const SizedBox(height: 200), // Espaço para a BottomNavigationBar
+
+                      ],
                     ),
                   ),
                 ],
               ),
-            ),
+      ),
       bottomNavigationBar: BottomNavigationBar(
-        // ... seu BottomNavigationBar (sem mudanças)
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         selectedItemColor: Colors.green.shade800,
         unselectedItemColor: Colors.black54,
-        backgroundColor: const Color(0xFFE0F8E0),
+        
+        backgroundColor: Colors.white, 
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Início"),
           BottomNavigationBarItem(
