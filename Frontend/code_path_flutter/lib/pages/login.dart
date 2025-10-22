@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'cadastro.dart';
-import 'home.dart';
+import 'home.dart'; // Pressupondo que PaginaHome está no arquivo home.dart
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -17,7 +17,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController senhaController = TextEditingController();
   bool isLoading = false;
-  bool obscurePassword = true; // 👁️ controla se a senha está visível
+  bool obscurePassword = true;
 
   // Controle da animação do gato
   late AnimationController _catController;
@@ -33,24 +33,43 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
       duration: const Duration(seconds: 1),
     )..repeat(reverse: true);
 
-    _rotation = Tween<double>(begin: -0.03, end: 0.03)
-        .animate(CurvedAnimation(parent: _catController, curve: Curves.easeInOut));
+    _rotation = Tween<double>(
+      begin: -0.03,
+      end: 0.03,
+    ).animate(CurvedAnimation(parent: _catController, curve: Curves.easeInOut));
 
-    _scale = Tween<double>(begin: 1.0, end: 1.08)
-        .animate(CurvedAnimation(parent: _catController, curve: Curves.easeInOut));
+    _scale = Tween<double>(
+      begin: 1.0,
+      end: 1.08,
+    ).animate(CurvedAnimation(parent: _catController, curve: Curves.easeInOut));
   }
 
   @override
   void dispose() {
     _catController.dispose();
+    emailController.dispose();
+    senhaController.dispose();
     super.dispose();
+  }
+
+  // Função para exibir o Alerta de Desenvolvimento
+  void _showDevelopmentAlert() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Funcionalidade 'Esqueceu a senha' em desenvolvimento."),
+        backgroundColor: Colors.orange,
+        duration: Duration(seconds: 3),
+      ),
+    );
   }
 
   Future<void> loginUser() async {
     setState(() => isLoading = true);
 
     try {
-      final url = Uri.parse("http://localhost:8000/login");
+      final url = Uri.parse(
+        "http://10.0.2.2:8000/login",
+      ); // localhost no Windows
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
@@ -70,6 +89,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
           const SnackBar(content: Text("Login realizado com sucesso!")),
         );
 
+        // Navega para a home
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const PaginaHome()),
@@ -80,16 +100,13 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Erro de conexão: $e")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Erro de conexão: $e")));
     }
 
     setState(() => isLoading = false);
   }
-
-  /*===============================
-      INTERFACE MODERNA E ORGÂNICA
-  ===============================*/
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +133,6 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 🐱 GATO ANIMADO
                   AnimatedBuilder(
                     animation: _catController,
                     builder: (context, child) {
@@ -135,7 +151,6 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                     ),
                   ),
                   const SizedBox(height: 25),
-
                   const Text(
                     "Bem-vindo de volta!",
                     style: TextStyle(
@@ -145,14 +160,15 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                     ),
                   ),
                   const SizedBox(height: 40),
-
-                  // 🔹 Container translúcido que agrupa os campos e o botão
                   ClipRRect(
                     borderRadius: BorderRadius.circular(25),
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 30,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.25),
                           borderRadius: BorderRadius.circular(25),
@@ -176,11 +192,35 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                               icon: Icons.email_outlined,
                             ),
                             const SizedBox(height: 20),
-
-                            // Campo de senha com ícone de olho 👁️
                             _buildPasswordField(),
 
-                            const SizedBox(height: 35),
+                            // 🚀 NOVO: Botão Esqueceu a senha
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: _showDevelopmentAlert,
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.only(
+                                    top: 8,
+                                    bottom: 0,
+                                  ),
+                                ),
+                                child: const Text(
+                                  "Esqueceu a senha?",
+                                  style: TextStyle(
+                                    color: Color(0xFF2E2E2E),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(
+                              height: 15,
+                            ), // Ajustado para dar espaço ao botão "Entrar"
+
                             AnimatedContainer(
                               duration: const Duration(milliseconds: 400),
                               curve: Curves.easeInOut,
@@ -198,7 +238,9 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                               child: ElevatedButton(
                                 onPressed: isLoading ? null : loginUser,
                                 style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
                                   backgroundColor: const Color(0xFF3CB371),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
@@ -230,7 +272,6 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 25),
                   TextButton(
                     onPressed: () => Navigator.push(
@@ -263,7 +304,6 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
     );
   }
 
-  // 🔹 Campo de texto normal (e-mail)
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
@@ -297,7 +337,6 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
     );
   }
 
-  // 🔹 Campo de senha com botão de visibilidade 👁️
   Widget _buildPasswordField() {
     return Container(
       decoration: BoxDecoration(

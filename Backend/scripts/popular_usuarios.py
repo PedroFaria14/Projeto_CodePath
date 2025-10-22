@@ -45,7 +45,7 @@ users_data = [
         },
         "idade": 30,
         "last_login": datetime.now(),
-        "nivel": "1",
+        "nivel": "3",
         "nome": "joao",
         "senha": "joao_pass",
         "streak": 0

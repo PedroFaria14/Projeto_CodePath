@@ -199,7 +199,7 @@ class _QuestaoPageState extends State<QuestaoPage> {
 
       final response = await http.get(
         Uri.parse(
-          "http://127.0.0.1:8000/pergunta/?nivel=$nivelFirebase&tipo=${Uri.encodeComponent(widget.tipoModulo)}&count=$count",
+          "http://10.0.2.2:8000/pergunta/?nivel=$nivelFirebase&tipo=${Uri.encodeComponent(widget.tipoModulo)}&count=$count",
         ),
       );
 
@@ -261,7 +261,7 @@ class _QuestaoPageState extends State<QuestaoPage> {
     if (email == null) return;
 
     final profileResp = await http.get(
-      Uri.parse("http://127.0.0.1:8000/profile/$email"),
+      Uri.parse("http://10.0.2.2:8000/profile/$email"),
     );
     final profileData = jsonDecode(profileResp.body);
     final user = profileData["user"] ?? profileData;
@@ -314,13 +314,13 @@ class _QuestaoPageState extends State<QuestaoPage> {
     };
 
     await http.post(
-      Uri.parse("http://127.0.0.1:8000/salvar_progresso"),
+      Uri.parse("http://10.0.2.2:8000/salvar_progresso"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode(payload),
     );
 
     final response = await http.get(
-      Uri.parse("http://127.0.0.1:8000/profile/$email"),
+      Uri.parse("http://10.0.2.2:8000/profile/$email"),
     );
     final data = jsonDecode(response.body);
     final userNovo = data["user"];
@@ -358,7 +358,7 @@ class _QuestaoPageState extends State<QuestaoPage> {
     final String respostaSelecionada = alternativas[alternativaSelecionada!];
 
     final response = await http.post(
-      Uri.parse("http://127.0.0.1:8000/responder"),
+      Uri.parse("http://10.0.2.2:8000/responder"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "idPergunta": idPergunta,

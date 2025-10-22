@@ -119,31 +119,54 @@ async def responder(resposta: RespostaUsuario):
         pergunta = doc.to_dict()
         correta = pergunta["resposta_correta"]
 
-        # 2. Busca persona
-        tipo_exercicio = pergunta.get("tipo")
-        prompts_persona = await get_persona_by_tipo(tipo_exercicio)
-
-        # 3. Valida resposta
+        # 2. Valida resposta
         acertou = resposta.resposta == correta
         
-        explicacao = "" # Inicializa a variável
-        try:
-            explicacao = gerar_explicacao(
-                pergunta["pergunta"], correta, resposta.resposta,
-                acertou=acertou, prompts_persona=prompts_persona
-            )
-        except Exception as gemini_e:
-            print(f"⚠️ ERRO CHAVE NO GEMINI: {gemini_e}")
-            explicacao = f"Erro ao gerar explicação. Tópico: {tipo_exercicio}. Verifique os prompts da IA. Detalhe do erro: {gemini_e}"
-        
-        # 4. Remove a formatação Markdown
-        explicacao_limpa = re.sub(r'\*\*|\*', '', explicacao)
-        explicacao_limpa = explicacao_limpa.replace('\n', ' ').strip()
+        explicacao_limpa = "" # Inicializa a variável
 
+        # --- LÓGICA MODIFICADA ---
+        if acertou:
+            # 3.a. Se ACERTOU, não chama a IA.
+            # Define uma mensagem de parabéns.
+            mensagens_sucesso = [
+                "Muito bem! Resposta correta.",
+                "Parabéns, é isso mesmo!",
+                "Exato! Continue assim.",
+                "Você acertou! 🎉"
+            ]
+            # (Usando o 'random' que já está importado no seu arquivo)
+            explicacao_limpa = random.choice(mensagens_sucesso)
+        
+        else:
+            # 3.b. Se ERROU, busca a persona e chama a IA.
+            
+            # Busca persona (só precisa fazer isso se errar)
+            tipo_exercicio = pergunta.get("tipo")
+            prompts_persona = await get_persona_by_tipo(tipo_exercicio)
+            
+            explicacao_ia = ""
+            try:
+                # Chama a IA para explicar o erro
+                explicacao_ia = gerar_explicacao(
+                    pergunta["pergunta"], correta, resposta.resposta,
+                    acertou=acertou, # 'acertou' será sempre False aqui
+                    prompts_persona=prompts_persona
+                )
+            except Exception as gemini_e:
+                print(f"⚠️ ERRO CHAVE NO GEMINI: {gemini_e}")
+                # Fallback em caso de erro da IA
+                explicacao_ia = "Ops, você errou. A resposta correta era: " + correta
+            
+            # 4. Remove a formatação Markdown (só da resposta da IA)
+            explicacao_limpa = re.sub(r'\*\*|\*', '', explicacao_ia)
+            explicacao_limpa = explicacao_limpa.replace('\n', ' ').strip()
+        # --- FIM DA LÓGICA MODIFICADA ---
+
+        # 5. Retorna a resposta
         return ApiResponse(
             success=acertou,
             message="Resposta correta 🎉" if acertou else "Resposta incorreta ❌",
-            explicacao=explicacao_limpa
+            explicacao=explicacao_limpa # Este campo agora tem a msg estática ou a explicação da IA
         )
 
     except HTTPException as e:

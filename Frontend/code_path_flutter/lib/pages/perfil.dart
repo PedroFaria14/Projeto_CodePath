@@ -29,7 +29,7 @@ class _PerfilPageState extends State<PerfilPage> {
 
     try {
       final response = await http.get(
-        Uri.parse("http://127.0.0.1:8000/profile/$email"),
+        Uri.parse("http://10.0.2.2:8000/profile/$email"),
       );
 
       if (response.statusCode == 200) {
@@ -64,29 +64,32 @@ class _PerfilPageState extends State<PerfilPage> {
     }
 
     if (usuario == null) {
-      return const Scaffold(body: Center(child: Text("Erro ao carregar perfil")));
+      return const Scaffold(
+        body: Center(child: Text("Erro ao carregar perfil")),
+      );
     }
 
     // 🚀 LÓGICA DE CÁLCULO DE PROGRESSO (para o formato MAPA ANINHADO)
     // 1. Define o módulo padrão (use a chave exata do seu FastAPI)
-    const String moduloPadrao = "Variáveis"; 
-    
+    const String moduloPadrao = "Variáveis";
+
     // 2. Extrai o MAPA de fases do usuário
     final Map<String, dynamic> fasesMap = Map<String, dynamic>.from(
-        usuario!["fases"] ?? {},
+      usuario!["fases"] ?? {},
     );
-    
+
     // 3. Pega a lista de fases desse módulo
     final List fasesDoModulo = List<Map<String, dynamic>>.from(
-        fasesMap[moduloPadrao] ?? [],
+      fasesMap[moduloPadrao] ?? [],
     );
-    
+
     // 4. Faz a contagem (o erro de tipo estava na linha 116)
-    final int liberadas = fasesDoModulo.where((f) => f["liberada"] == true).length;
+    final int liberadas = fasesDoModulo
+        .where((f) => f["liberada"] == true)
+        .length;
     final int total = fasesDoModulo.length;
     // Se o total for 0 (módulo não existe), previne divisão por zero ou exibição incorreta
     final String progressoFases = total > 0 ? "$liberadas/$total" : "0/0";
-
 
     return Scaffold(
       backgroundColor: const Color(0xFFDFF5E1),
@@ -107,97 +110,90 @@ class _PerfilPageState extends State<PerfilPage> {
       ),
       // 💥 CORREÇÃO 2: Estrutura do body simplificada após a verificação de loading/erro
       body: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            // 🔹 Avatar + Nome
+            CircleAvatar(
+              radius: 50,
+              backgroundColor: Colors.green.shade400,
+              child: const Icon(Icons.person, size: 60, color: Colors.white),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              usuario!["nome"] ?? "Usuário",
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              usuario!["email"] ?? "",
+              style: const TextStyle(color: Colors.black54),
+            ),
+
+            const SizedBox(height: 30),
+
+            // 🔹 Estatísticas de progresso
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _statCard(
+                  "Nível",
+                  usuario!["nivel"] ?? "iniciante",
+                  Icons.school,
+                ),
+                _statCard(
+                  "Streak",
+                  "${usuario!["streak"] ?? 0}",
+                  Icons.local_fire_department,
+                  color: Colors.orange,
+                ),
+                _statCard(
+                  "Fases",
+                  progressoFases, // Usa a variável calculada
+                  Icons.flag,
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 30),
+
+            // 🔹 Informações pessoais
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.green.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.all(16),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 🔹 Avatar + Nome
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.green.shade400,
-                    child: const Icon(
-                      Icons.person,
-                      size: 60,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    usuario!["nome"] ?? "Usuário",
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    usuario!["email"] ?? "",
-                    style: const TextStyle(color: Colors.black54),
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // 🔹 Estatísticas de progresso
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _statCard(
-                        "Nível",
-                        usuario!["nivel"] ?? "iniciante",
-                        Icons.school,
-                      ),
-                      _statCard(
-                        "Streak",
-                        "${usuario!["streak"] ?? 0}",
-                        Icons.local_fire_department,
-                        color: Colors.orange,
-                      ),
-                      _statCard(
-                        "Fases",
-                        progressoFases, // Usa a variável calculada
-                        Icons.flag,
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // 🔹 Informações pessoais
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _info("Idade", "${usuario!["idade"] ?? "-"} anos"),
-                        _info("Telefone", "${usuario!["telefone"] ?? "-"}"),
-                        _info("Nível atual", usuario!["nivel"] ?? "-"),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  // 🔹 Botão sair
-                  ElevatedButton.icon(
-                    onPressed: logout,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade400,
-                      minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: const Icon(Icons.logout),
-                    label: const Text(
-                      "Sair da conta",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
+                  _info("Idade", "${usuario!["idade"] ?? "-"} anos"),
+                  _info("Telefone", "${usuario!["telefone"] ?? "-"}"),
+                  _info("Nível atual", usuario!["nivel"] ?? "-"),
                 ],
               ),
             ),
+
+            const SizedBox(height: 40),
+
+            // 🔹 Botão sair
+            ElevatedButton.icon(
+              onPressed: logout,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade400,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.logout),
+              label: const Text(
+                "Sair da conta",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
