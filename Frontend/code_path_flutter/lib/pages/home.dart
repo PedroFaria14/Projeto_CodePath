@@ -50,8 +50,8 @@ class _PaginaHomeState extends State<PaginaHome> {
       "gradient": [const Color(0xFF4C7516), const Color(0xFF8EDB29)],
       "backgroundAsset": "assets/fundos_trilhas/fundo_papagaio.png",
       "posicoes": [
-        const Offset(0.53, 0.30), // 1º
-        const Offset(0.37, 0.41), // 2º
+        const Offset(0.53, 0.33), // 1º
+        const Offset(0.37, 0.42), // 2º
         const Offset(0.46, 0.54), // 3º
         const Offset(0.51, 0.68), // 4º
         const Offset(0.60, 0.82), // 5º
@@ -62,11 +62,11 @@ class _PaginaHomeState extends State<PaginaHome> {
       "animal": "assets/imagens/Esquilo.png",
       "backgroundAsset": "assets/fundos_trilhas/fundo_esquilo.png",
       "posicoes": [
-        const Offset(0.53, 0.30), // 1º
-        const Offset(0.37, 0.41), // 2º
+        const Offset(0.53, 0.33), // 1º
+        const Offset(0.37, 0.42), // 2º
         const Offset(0.46, 0.54), // 3º
-        const Offset(0.51, 0.68), // 4º
-        const Offset(0.60, 0.82), // 5º
+        const Offset(0.51, 0.70), // 4º
+        const Offset(0.60, 0.80), // 5º
         const Offset(0.34, 0.83), // 6º
       ],
       "gradient": [const Color(0xFF8D6E63), const Color(0xFFA1887F)],
@@ -82,11 +82,11 @@ class _PaginaHomeState extends State<PaginaHome> {
       "stops": [0.0, 0.29, 0.46, 0.86],
       "backgroundAsset": "assets/fundos_trilhas/fundo_canguru.png",
       "posicoes": [
-        const Offset(0.55, 0.30), // 1º
-        const Offset(0.39, 0.42), // 2º
-        const Offset(0.48, 0.55), // 3º
-        const Offset(0.533, 0.69), // 4º
-        const Offset(0.63, 0.85), // 5º
+        const Offset(0.55, 0.33), // 1º
+        const Offset(0.399, 0.43), // 2º
+        const Offset(0.489, 0.55), // 3º
+        const Offset(0.533, 0.67), // 4º
+        const Offset(0.63, 0.79), // 5º
         const Offset(0.34, 0.85), // 6º
       ],
     },
@@ -101,11 +101,11 @@ class _PaginaHomeState extends State<PaginaHome> {
       "stops": [0.07, 0.38, 0.58, 0.87],
       "backgroundAsset": "assets/fundos_trilhas/fundo_abelha.png",
       "posicoes": [
-        const Offset(0.55, 0.28), // 1º
-        const Offset(0.38, 0.40), // 2º
+        const Offset(0.55, 0.32), // 1º
+        const Offset(0.389, 0.41), // 2º
         const Offset(0.48, 0.53), // 3º
-        const Offset(0.53, 0.67), // 4º
-        const Offset(0.62, 0.81), // 5º
+        const Offset(0.53, 0.66), // 4º
+        const Offset(0.62, 0.78), // 5º
         const Offset(0.34, 0.83), // 6º
       ],
     },
@@ -114,11 +114,11 @@ class _PaginaHomeState extends State<PaginaHome> {
       "gradient": [const Color(0xFF616161), const Color(0xFF424242)],
       "backgroundAsset": "assets/fundos_trilhas/fundo_cachorro.png",
       "posicoes": [
-        const Offset(0.53, 0.30), // 1º
-        const Offset(0.37, 0.41), // 2º
+        const Offset(0.53, 0.33), // 1º
+        const Offset(0.37, 0.42), // 2º
         const Offset(0.46, 0.54), // 3º
-        const Offset(0.51, 0.68), // 4º
-        const Offset(0.60, 0.82), // 5º
+        const Offset(0.51, 0.66), // 4º
+        const Offset(0.60, 0.79), // 5º
         const Offset(0.34, 0.83), // 6º
       ],
     },
@@ -248,41 +248,85 @@ class _PaginaHomeState extends State<PaginaHome> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final email = prefs.getString("userEmail");
-      if (email == null || email.isEmpty) return;
 
-      // ⚠️ Lembre-se: Mudar para 10.0.2.2 se no emulador
-      final response = await http.get(
-        Uri.parse("http://10.0.2.2:8000/profile/$email"),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
+      if (email == null || email.isEmpty) {
         setState(() {
-          streak = data["user"]["streak"] ?? 0;
-
-          // --- INÍCIO DA CORREÇÃO ---
-          String nomeCompleto = data["user"]["nome"] ?? "Usuário";
-
-          // Se o nome for o e-mail, extraímos a primeira parte
-          if (nomeCompleto.contains('@') && nomeCompleto == email) {
-            String nomeDoEmail = nomeCompleto.split('@')[0];
-
-            if (nomeDoEmail.isNotEmpty) {
-              // Capitaliza a primeira letra para exibir como "Pedro"
-              nomeCompleto =
-                  nomeDoEmail[0].toUpperCase() + nomeDoEmail.substring(1);
-            }
-          }
-
-          nomeUsuario = nomeCompleto;
-          // --- FIM DA CORREÇÃO ---
+          nomeUsuario = "Usuário"; // Garante o padrão se não houver login
+          streak = 0;
         });
-      } else {
-        debugPrint("Erro ao carregar perfil: ${response.body}");
+        return;
+      }
+
+      int maxTentativas = 3; // Vamos tentar buscar 3 vezes
+      int delayEmMs = 500; // Esperar meio segundo entre as tentativas
+
+      for (int i = 0; i < maxTentativas; i++) {
+        // Tenta buscar o perfil
+        final response = await http.get(
+          Uri.parse("http://10.0.2.2:8000/profile/$email"),
+        );
+
+        if (response.statusCode == 200) {
+          // 🚀 SUCESSO! Encontrou o perfil.
+          final data = jsonDecode(response.body);
+
+          setState(() {
+            streak = data["user"]["streak"] ?? 0;
+
+            String nomeCompleto = data["user"]["nome"] ?? "Usuário";
+
+            // Se o nome for o e-mail, extraímos a primeira parte
+            if (nomeCompleto.contains('@') && nomeCompleto == email) {
+              String nomeDoEmail = nomeCompleto.split('@')[0];
+
+              if (nomeDoEmail.isNotEmpty) {
+                // Capitaliza a primeira letra para exibir como "Pedro"
+                nomeCompleto =
+                    nomeDoEmail[0].toUpperCase() + nomeDoEmail.substring(1);
+              }
+            }
+            nomeUsuario = nomeCompleto;
+          });
+
+          return; // Para a função aqui, pois deu certo.
+        } else if (response.statusCode == 404) {
+          // ⚠️ FALHA (404): Perfil não encontrado.
+          debugPrint(
+            "Tentativa ${i + 1} de $maxTentativas: Perfil $email não encontrado (404).",
+          );
+
+          if (i == maxTentativas - 1) {
+            // Se foi a última tentativa, desiste e assume "Usuário"
+            debugPrint("Desistindo de buscar perfil. Assumindo 'Usuário'.");
+            setState(() {
+              nomeUsuario = "Usuário";
+              streak = 0;
+            });
+          } else {
+            // Se não foi a última, espera um pouco e o loop tentará de novo.
+            await Future.delayed(Duration(milliseconds: delayEmMs));
+          }
+        } else {
+          // Outro erro (500, 401, etc.)
+          debugPrint(
+            "Erro ao carregar perfil (Status ${response.statusCode}): ${response.body}",
+          );
+          setState(() {
+            nomeUsuario = "Usuário";
+            streak = 0;
+          });
+          return; // Desiste em outros erros.
+        }
       }
     } catch (e) {
-      debugPrint("Erro ao carregar usuário: $e");
+      debugPrint("Erro de rede ao carregar usuário: $e");
+      // Se der erro de conexão, assume "Usuário"
+      if (mounted) {
+        setState(() {
+          nomeUsuario = "Usuário";
+          streak = 0;
+        });
+      }
     }
   }
 
@@ -323,11 +367,24 @@ class _PaginaHomeState extends State<PaginaHome> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final user = data["user"] ?? data;
-        final fasesData = user["fases"];
-        final Map<String, dynamic> fasesMap = Map<String, dynamic>.from(
-          fasesData ?? {},
-        );
 
+        // 🚀 INÍCIO DA CORREÇÃO
+        // 1. Pegue o campo 'fases', que pode ser Map, List ou null
+        final dynamic fasesData = user["fases"];
+        Map<String, dynamic> fasesMap; // 2. Declare o Mapa que vamos usar
+
+        // 3. Verifique o tipo de 'fasesData'
+        if (fasesData is Map) {
+          // Se for um Mapa (usuário antigo), converta-o
+          fasesMap = Map<String, dynamic>.from(fasesData);
+        } else {
+          // Se for uma Lista (usuário novo) ou null,
+          // apenas crie um Mapa vazio.
+          fasesMap = {};
+        }
+        // 🚀 FIM DA CORREÇÃO
+
+        // 4. Agora o resto do seu código funciona, pois 'fasesMap' É um mapa.
         List<Map<String, dynamic>> fases = List<Map<String, dynamic>>.from(
           fasesMap[nomeModuloAPI] ?? [],
         );

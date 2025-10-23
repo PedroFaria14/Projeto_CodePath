@@ -19,22 +19,19 @@ class Cadastro extends StatefulWidget {
 class _CadastroState extends State<Cadastro> {
   // Controladores de digitação
   final TextEditingController nomeController = TextEditingController();
-  // 🚀 NOVO: Controlador para data de nascimento
   final TextEditingController dataNascimentoController =
       TextEditingController();
   final TextEditingController telefoneController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController senhaController = TextEditingController();
-  // 🚀 NOVO: Controlador para confirmar senha
   final TextEditingController confirmarSenhaController =
       TextEditingController();
 
   bool isLoading = false;
-  // 🚀 NOVO: Variáveis de estado para visibilidade da senha
   bool _senhaVisivel = false;
   bool _confirmarSenhaVisivel = false;
 
-  // 🚀 NOVO: Função para mostrar o DatePicker
+  // Função para mostrar o DatePicker
   Future<void> _selecionarData(BuildContext context) async {
     final DateTime? dataSelecionada = await showDatePicker(
       context: context,
@@ -76,7 +73,6 @@ class _CadastroState extends State<Cadastro> {
       return;
     }
 
-    // 🚀 NOVO: Validação de confirmação de senha
     if (senhaController.text != confirmarSenhaController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("⚠️ As senhas não coincidem!")),
@@ -94,7 +90,6 @@ class _CadastroState extends State<Cadastro> {
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "nome": nomeController.text.trim(),
-          // 🚀 ALTERADO: Envia 'data_nascimento' em vez de 'idade'
           "data_nascimento": dataNascimentoController.text
               .trim(), // Já está formatada
           "telefone": telefoneController.text.trim(),
@@ -144,13 +139,12 @@ class _CadastroState extends State<Cadastro> {
   }
 
   /*===============================
-      INTERFACE MODERNA E ORGÂNICA
-  ===============================*/
+      INTERFACE MODERNA E ORGÂNICA
+  ===============================*/
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Seu fundo gradiente (sem alterações)
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -167,7 +161,8 @@ class _CadastroState extends State<Cadastro> {
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              // Permite rolar se o teclado aparecer
+              // 🚀 NOVO: Adiciona padding nas laterais do formulário
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
                 mainAxisAlignment:
                     MainAxisAlignment.center, // Centraliza verticalmente
@@ -177,7 +172,7 @@ class _CadastroState extends State<Cadastro> {
                     "assets/imagens/gato.png",
                     height: 120,
                     width: 120,
-                  ), // Ajustei levemente o tamanho
+                  ),
                   const SizedBox(height: 20),
                   const Text(
                     "Crie sua conta",
@@ -187,7 +182,8 @@ class _CadastroState extends State<Cadastro> {
                       color: Color(0xFF2E2E2E),
                     ),
                   ),
-                  const SizedBox(height: 30),
+                  // 🚀 ALTERADO: Espaçamento
+                  const SizedBox(height: 24),
 
                   // --- Campos de Texto Atualizados ---
 
@@ -198,7 +194,6 @@ class _CadastroState extends State<Cadastro> {
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: const Color(0xFF2C2C54),
-                      // 🚀 ALTERADO: labelText -> hintText
                       hintText: "Nome de usuário",
                       hintStyle: const TextStyle(color: Colors.white70),
                       border: OutlineInputBorder(
@@ -211,8 +206,10 @@ class _CadastroState extends State<Cadastro> {
                       ), // Ajuste padding
                     ),
                   ),
-                  const SizedBox(height: 20), // Espaçamento ajustado
-                  // 🚀 ALTERADO: Campo Idade para Data de Nascimento
+                  // 🚀 ALTERADO: Espaçamento
+                  const SizedBox(height: 16),
+
+                  // Data de Nascimento
                   TextField(
                     controller: dataNascimentoController,
                     style: const TextStyle(color: Colors.white),
@@ -238,7 +235,8 @@ class _CadastroState extends State<Cadastro> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  // 🚀 ALTERADO: Espaçamento
+                  const SizedBox(height: 16),
 
                   // Telefone
                   TextField(
@@ -261,7 +259,8 @@ class _CadastroState extends State<Cadastro> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  // 🚀 ALTERADO: Espaçamento
+                  const SizedBox(height: 16),
 
                   // Email
                   TextField(
@@ -283,13 +282,13 @@ class _CadastroState extends State<Cadastro> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  // 🚀 ALTERADO: Espaçamento
+                  const SizedBox(height: 16),
 
                   // Senha
                   TextField(
                     controller: senhaController,
                     style: const TextStyle(color: Colors.white),
-                    // 🚀 ALTERADO: obscureText usa a variável de estado
                     obscureText: !_senhaVisivel,
                     decoration: InputDecoration(
                       filled: true,
@@ -304,7 +303,6 @@ class _CadastroState extends State<Cadastro> {
                         horizontal: 16,
                         vertical: 15,
                       ),
-                      // 🚀 NOVO: Ícone de visibilidade
                       suffixIcon: IconButton(
                         icon: Icon(
                           _senhaVisivel
@@ -320,9 +318,10 @@ class _CadastroState extends State<Cadastro> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  // 🚀 ALTERADO: Espaçamento
+                  const SizedBox(height: 16),
 
-                  // 🚀 NOVO: Campo Confirmar Senha
+                  // Confirmar Senha
                   TextField(
                     controller: confirmarSenhaController,
                     style: const TextStyle(color: Colors.white),
@@ -355,21 +354,22 @@ class _CadastroState extends State<Cadastro> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 30),
+                  // 🚀 ALTERADO: Espaçamento
+                  const SizedBox(height: 24),
 
                   // Botão Confirmar
                   ElevatedButton(
                     onPressed: isLoading ? null : cadastrarUsuario,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF3CB371),
-                      minimumSize: const Size(double.infinity, 50),
+                      // 🚀 ALTERADO: Altura do botão
+                      minimumSize: const Size(double.infinity, 48),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: isLoading
                         ? const SizedBox(
-                            // Indicador de progresso menor
                             height: 24,
                             width: 24,
                             child: CircularProgressIndicator(
