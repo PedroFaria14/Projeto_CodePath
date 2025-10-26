@@ -575,6 +575,328 @@ questions_data = [
     "pergunta": "O que pode acontecer se uma variável não for inicializada antes do uso?",
     "opcoes": ["Nada", "Erro ou comportamento inesperado", "Ela vira zero automaticamente", "Ela é criada como texto"],
     "resposta_correta": "Erro ou comportamento inesperado"
+  }, 
+   {
+    "nivel": "Facil",
+    "idPergunta": "7000",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que é uma variável em programação?",
+    "opcoes": ["Um valor fixo", "Um nome que armazena dados", "Um operador lógico", "Um tipo de dado numérico"],
+    "resposta_correta": "Um nome que armazena dados"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7001",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual símbolo é usado para indicar um comentário em Python?",
+    "opcoes": ["//", "#", "<!-- -->", "/* */"],
+    "resposta_correta": "#"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7002",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual tipo de dado armazena textos em Python?",
+    "opcoes": ["int", "string", "bool", "float"],
+    "resposta_correta": "string"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7003",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual das opções abaixo é uma estrutura de repetição?",
+    "opcoes": ["if", "for", "else", "try"],
+    "resposta_correta": "for"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7004",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual operador é usado para comparar igualdade em muitas linguagens?",
+    "opcoes": ["=", "==", "!=", "==="],
+    "resposta_correta": "=="
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7005",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que é uma função?",
+    "opcoes": ["Um loop infinito", "Um bloco de código reutilizável", "Um tipo de variável", "Um erro no código"],
+    "resposta_correta": "Um bloco de código reutilizável"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7006",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que é um 'bug' em programação?",
+    "opcoes": ["Um tipo de dado", "Um erro no código", "Um programa executável", "Uma função"],
+    "resposta_correta": "Um erro no código"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7007",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual comando imprime algo na tela em Python?",
+    "opcoes": ["echo()", "print()", "show()", "output()"],
+    "resposta_correta": "print()"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7008",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual é o resultado de 3 + 2 * 2 em Python?",
+    "opcoes": ["10", "7", "8", "6"],
+    "resposta_correta": "7"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7009",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que significa IDE?",
+    "opcoes": ["Internal Data Extension", "Integrated Development Environment", "Internet Development Engine", "Interactive Design Example"],
+    "resposta_correta": "Integrated Development Environment"
+  },
+
+  {
+    "nivel": "Medio",
+    "idPergunta": "7010",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual das estruturas abaixo é imutável em Python?",
+    "opcoes": ["List", "Set", "Tuple", "Dictionary"],
+    "resposta_correta": "Tuple"
+  },
+  {
+    "nivel": "Medio",
+    "idPergunta": "7011",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Em uma função, o que significa 'return'?",
+    "opcoes": ["Interrompe o loop", "Define uma variável", "Envia um valor de volta", "Declara uma classe"],
+    "resposta_correta": "Envia um valor de volta"
+  },
+  {
+    "nivel": "Medio",
+    "idPergunta": "7012",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que é uma exceção em programação?",
+    "opcoes": ["Um tipo de dado especial", "Um erro tratado pelo programa", "Um método de classe", "Uma variável global"],
+    "resposta_correta": "Um erro tratado pelo programa"
+  },
+  {
+    "nivel": "Medio",
+    "idPergunta": "7013",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual a principal vantagem de usar funções?",
+    "opcoes": ["Repetir código", "Organizar e reutilizar código", "Deixar o código mais longo", "Diminuir desempenho"],
+    "resposta_correta": "Organizar e reutilizar código"
+  },
+  {
+    "nivel": "Medio",
+    "idPergunta": "7014",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que é POO (Programação Orientada a Objetos)?",
+    "opcoes": ["Um estilo baseado em funções", "Um estilo baseado em objetos e classes", "Um método de depuração", "Um tipo de IDE"],
+    "resposta_correta": "Um estilo baseado em objetos e classes"
+  },
+  {
+    "nivel": "Medio",
+    "idPergunta": "7015",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Em JavaScript, qual palavra-chave declara uma variável de escopo de bloco?",
+    "opcoes": ["var", "let", "const", "block"],
+    "resposta_correta": "let"
+  },
+  {
+    "nivel": "Medio",
+    "idPergunta": "7016",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que é um array?",
+    "opcoes": ["Um tipo de erro", "Uma estrutura que armazena múltiplos valores", "Uma função matemática", "Um tipo de string"],
+    "resposta_correta": "Uma estrutura que armazena múltiplos valores"
+  },
+  {
+    "nivel": "Medio",
+    "idPergunta": "7017",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que é um algoritmo?",
+    "opcoes": ["Um conjunto de instruções para resolver um problema", "Um tipo de variável", "Uma linguagem de programação", "Um compilador"],
+    "resposta_correta": "Um conjunto de instruções para resolver um problema"
+  },
+  {
+    "nivel": "Medio",
+    "idPergunta": "7018",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Em SQL, qual comando é usado para selecionar dados de uma tabela?",
+    "opcoes": ["GET", "FETCH", "SELECT", "TAKE"],
+    "resposta_correta": "SELECT"
+  },
+  {
+    "nivel": "Medio",
+    "idPergunta": "7019",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Em HTML, qual tag é usada para criar um link?",
+    "opcoes": ["<link>", "<a>", "<href>", "<url>"],
+    "resposta_correta": "<a>"
+  },
+
+  {
+    "nivel": "Dificil",
+    "idPergunta": "7020",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que é recursão em programação?",
+    "opcoes": ["Uma função que chama outra função", "Uma função que chama a si mesma", "Um loop infinito", "Um tipo de erro"],
+    "resposta_correta": "Uma função que chama a si mesma"
+  },
+  {
+    "nivel": "Dificil",
+    "idPergunta": "7021",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual é a complexidade de tempo do algoritmo de ordenação 'merge sort'?",
+    "opcoes": ["O(n)", "O(n²)", "O(log n)", "O(n log n)"],
+    "resposta_correta": "O(n log n)"
+  },
+  {
+    "nivel": "Dificil",
+    "idPergunta": "7022",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que significa 'closure' em JavaScript?",
+    "opcoes": ["Uma função sem parâmetros", "Uma função que mantém acesso às variáveis do seu escopo externo", "Um tipo de classe", "Um loop"],
+    "resposta_correta": "Uma função que mantém acesso às variáveis do seu escopo externo"
+  },
+  {
+    "nivel": "Dificil",
+    "idPergunta": "7023",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que é um 'deadlock' em sistemas concorrentes?",
+    "opcoes": ["Quando dois processos esperam indefinidamente por recursos um do outro", "Quando o sistema reinicia", "Um erro de compilação", "Uma exceção de tempo de execução"],
+    "resposta_correta": "Quando dois processos esperam indefinidamente por recursos um do outro"
+  },
+  {
+    "nivel": "Dificil",
+    "idPergunta": "7024",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Em Python, o que faz o decorador @staticmethod?",
+    "opcoes": ["Cria um método que não usa self", "Cria uma variável estática", "Impede o uso de herança", "Torna o método privado"],
+    "resposta_correta": "Cria um método que não usa self"
+  },
+  {
+    "nivel": "Dificil",
+    "idPergunta": "7025",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que é uma 'promise' em JavaScript?",
+    "opcoes": ["Um tipo de loop", "Um objeto que representa uma operação assíncrona", "Um erro de execução", "Uma variável global"],
+    "resposta_correta": "Um objeto que representa uma operação assíncrona"
+  },
+  {
+    "nivel": "Dificil",
+    "idPergunta": "7026",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Em bancos de dados, o que é 'normalização'?",
+    "opcoes": ["Processo de duplicar dados", "Organizar dados para evitar redundância", "Criação de índices", "Remover chaves primárias"],
+    "resposta_correta": "Organizar dados para evitar redundância"
+  },
+  {
+    "nivel": "Dificil",
+    "idPergunta": "7027",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que é polimorfismo na programação orientada a objetos?",
+    "opcoes": ["Múltiplas classes herdando de uma única função", "Capacidade de um objeto assumir várias formas", "Método que só aceita inteiros", "Herança múltipla"],
+    "resposta_correta": "Capacidade de um objeto assumir várias formas"
+  },
+  {
+    "nivel": "Dificil",
+    "idPergunta": "7028",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual estrutura de dados é mais eficiente para busca binária?",
+    "opcoes": ["Lista ordenada", "Pilha", "Fila", "Hash table"],
+    "resposta_correta": "Lista ordenada"
+  },
+  {
+    "nivel": "Dificil",
+    "idPergunta": "7029",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que é garbage collection?",
+    "opcoes": ["Processo de alocar memória", "Processo automático de liberar memória não usada", "Remoção de erros do código", "Desempenho do processador"],
+    "resposta_correta": "Processo automático de liberar memória não usada"
+  },
+   {
+    "nivel": "Facil",
+    "idPergunta": "7030",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que significa a sigla CPU?",
+    "opcoes": ["Central Process Unit", "Central Processing Unit", "Computer Power Unit", "Control Processing Utility"],
+    "resposta_correta": "Central Processing Unit"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7031",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual dispositivo é responsável por armazenar dados permanentemente no computador?",
+    "opcoes": ["RAM", "Processador", "HD ou SSD", "Placa de vídeo"],
+    "resposta_correta": "HD ou SSD"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7032",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Em programação, o que é um 'comentário'?",
+    "opcoes": ["Um código executável", "Um texto ignorado pelo compilador", "Um erro no código", "Uma variável global"],
+    "resposta_correta": "Um texto ignorado pelo compilador"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7033",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual símbolo é usado para indicar diferentes níveis de identação em Python?",
+    "opcoes": ["Tabulação e espaços", "Parênteses", "Aspas", "Vírgulas"],
+    "resposta_correta": "Tabulação e espaços"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7034",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual comando é usado para ler uma entrada do usuário em Python?",
+    "opcoes": ["read()", "input()", "get()", "scan()"],
+    "resposta_correta": "input()"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7035",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual destes é um exemplo de operador lógico?",
+    "opcoes": ["+", "&&", "||", "and"],
+    "resposta_correta": "and"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7036",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual é o tipo de dado retornado pela função input() em Python?",
+    "opcoes": ["int", "float", "string", "bool"],
+    "resposta_correta": "string"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7037",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual palavra é usada para criar uma condição alternativa ao 'if'?",
+    "opcoes": ["else", "loop", "stop", "return"],
+    "resposta_correta": "else"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7038",
+    "tipo": "Perguntas diversas",
+    "pergunta": "O que acontece quando um programa entra em um loop infinito?",
+    "opcoes": ["O código termina rápido", "O programa nunca para de executar", "O computador desliga automaticamente", "Nada acontece"],
+    "resposta_correta": "O programa nunca para de executar"
+  },
+  {
+    "nivel": "Facil",
+    "idPergunta": "7039",
+    "tipo": "Perguntas diversas",
+    "pergunta": "Qual linguagem de programação é amplamente usada para criar aplicativos Android?",
+    "opcoes": ["Swift", "Kotlin", "Ruby", "PHP"],
+    "resposta_correta": "Kotlin"
   }
 ]
 

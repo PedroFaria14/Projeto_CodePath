@@ -14,6 +14,8 @@ from pages.home import router as home_router
 from pages.update_nivel import router as update_nivel_router
 from pages.leasson import router as leasson_router
 from pages.progress import router as progress
+from pages import forgotPass
+
   
 PORT = 8000
 
@@ -42,5 +44,5 @@ app.include_router(home_router)
 app.include_router(leasson_router)
 app.include_router(profile_router)
 app.include_router(progress)
-
+app.include_router(forgotPass.router, tags=["Password Reset"])
 

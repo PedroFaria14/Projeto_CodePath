@@ -53,8 +53,8 @@ class _PaginaHomeState extends State<PaginaHome> {
         const Offset(0.53, 0.33), // 1º
         const Offset(0.37, 0.42), // 2º
         const Offset(0.46, 0.54), // 3º
-        const Offset(0.51, 0.68), // 4º
-        const Offset(0.60, 0.82), // 5º
+        const Offset(0.51, 0.66), // 4º
+        const Offset(0.60, 0.79), // 5º
         const Offset(0.34, 0.83), // 6º
       ],
     },
@@ -65,8 +65,8 @@ class _PaginaHomeState extends State<PaginaHome> {
         const Offset(0.53, 0.33), // 1º
         const Offset(0.37, 0.42), // 2º
         const Offset(0.46, 0.54), // 3º
-        const Offset(0.51, 0.70), // 4º
-        const Offset(0.60, 0.80), // 5º
+        const Offset(0.51, 0.67), // 4º
+        const Offset(0.60, 0.79), // 5º
         const Offset(0.34, 0.83), // 6º
       ],
       "gradient": [const Color(0xFF8D6E63), const Color(0xFFA1887F)],
@@ -332,94 +332,112 @@ class _PaginaHomeState extends State<PaginaHome> {
 
   // 🚀 CORREÇÃO: Adicionado feedback de erro (SnackBar) para falhas de API/Login
   Future<void> abrirTrilha(String tipoModulo) async {
-    // Verifica se o widget ainda está na tela antes de mostrar SnackBar/Navegar
-    if (!mounted) return;
+    print("PaginaHome: Iniciando abrirTrilha para $tipoModulo");
+
+    // Mostra o loading imediatamente APENAS SE MONTADO
+    if (mounted) {
+      setState(() {
+        carregando = true;
+      });
+    } else {
+      print(
+        "PaginaHome: abrirTrilha chamada mas widget não está montado (início). Saindo.",
+      );
+      return; // Sai se não estiver montado logo no início
+    }
+
+    String? email; // Variável para guardar o email
+    List<Map<String, dynamic>> fasesParaTrilha = []; // Inicia vazia
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final email = prefs.getString("userEmail");
+      email = prefs.getString("userEmail");
 
-      if (email == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Erro: Usuário não encontrado. Faça login."),
-            backgroundColor: Colors.red,
-          ),
-        );
+      // Verifica email
+      if (email == null || email.isEmpty) {
+        if (mounted) {
+          print("PaginaHome: Erro em abrirTrilha - Usuário não logado.");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Erro: Usuário não logado."),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() => carregando = false); // Esconde loading
+        }
         return;
       }
 
+      // --- Preparação dos dados para TrilhaUm (sem alterações) ---
       final String nomeModuloAPI = _moduloNameMap[tipoModulo] ?? tipoModulo;
-
       final info = _moduloMetadata[tipoModulo] ?? _defaultInfo;
-
       final String backgroundAsset = info["backgroundAsset"] as String;
       final List<Offset> posicoes = List<Offset>.from(info["posicoes"]);
-
       final animalAsset = info["animal"] as String;
       final List<Color> gradientColors = info["gradient"] as List<Color>;
       final appBarTitle = _appBarTitles[tipoModulo] ?? tipoModulo;
+      // --- Fim da preparação ---
 
+      print(
+        "PaginaHome: Buscando perfil para $email antes de navegar para TrilhaUm.",
+      );
+      // Busca o perfil para pegar as fases ATUAIS antes de navegar
       final response = await http.get(
         Uri.parse("http://10.0.2.2:8000/profile/$email"),
       );
 
+      // Verifica se ainda está montado APÓS a chamada async
+      if (!mounted) {
+        print(
+          "PaginaHome: Widget desmontado após buscar perfil. Saindo de abrirTrilha.",
+        );
+        return;
+      }
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final user = data["user"] ?? data;
-
-        // 🚀 INÍCIO DA CORREÇÃO
-        // 1. Pegue o campo 'fases', que pode ser Map, List ou null
         final dynamic fasesData = user["fases"];
-        Map<String, dynamic> fasesMap; // 2. Declare o Mapa que vamos usar
+        Map<String, dynamic> fasesMap;
 
-        // 3. Verifique o tipo de 'fasesData'
+        // Lógica para lidar com Map ou List vindo do backend (sem alterações)
         if (fasesData is Map) {
-          // Se for um Mapa (usuário antigo), converta-o
           fasesMap = Map<String, dynamic>.from(fasesData);
         } else {
-          // Se for uma Lista (usuário novo) ou null,
-          // apenas crie um Mapa vazio.
           fasesMap = {};
         }
-        // 🚀 FIM DA CORREÇÃO
 
-        // 4. Agora o resto do seu código funciona, pois 'fasesMap' É um mapa.
-        List<Map<String, dynamic>> fases = List<Map<String, dynamic>>.from(
+        fasesParaTrilha = List<Map<String, dynamic>>.from(
           fasesMap[nomeModuloAPI] ?? [],
         );
 
-        // Inicializa as fases se for a primeira vez
-        if (fases.isEmpty) {
-          fases = List.generate(
+        // Inicializa fases se necessário (sem alterações)
+        if (fasesParaTrilha.isEmpty) {
+          print(
+            "PaginaHome: Inicializando fases localmente para $nomeModuloAPI",
+          );
+          fasesParaTrilha = List.generate(
             5,
-            (i) => {
-              "id": i + 1,
-              "liberada": i == 0 ? true : false,
-              "atual": i == 0 ? true : false,
-            },
+            (i) => {"id": i + 1, "liberada": i == 0, "atual": i == 0},
           );
-          final payload = {
-            "email": email,
-            "tipo": nomeModuloAPI,
-            "fases": fases,
-          };
-          await http.post(
-            Uri.parse("http://10.0.2.2:8000/salvar_progresso"),
-            headers: {"Content-Type": "application/json"},
-            body: jsonEncode(payload),
-          );
+          // Considerar salvar no backend aqui se a lógica exigir
         }
+        print(
+          "PaginaHome: Fases carregadas/inicializadas para $nomeModuloAPI. Fases: $fasesParaTrilha",
+        );
 
-        // Só navega se o 'context' ainda for válido
-        if (!mounted) return;
+        // Esconde o loading ANTES de navegar
+        setState(() => carregando = false);
+
+        print("PaginaHome: Navegando para TrilhaUm...");
+        // Navega para a TrilhaUm e ESPERA ela fechar
         await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => TrilhaUm(
               tipoModulo: appBarTitle,
               tipoModuloAPI: nomeModuloAPI,
-              fases: fases,
+              fases: fasesParaTrilha, // Passa as fases corretas
               backgroundAsset: backgroundAsset,
               posicoes: posicoes,
               animalAsset: animalAsset,
@@ -427,24 +445,76 @@ class _PaginaHomeState extends State<PaginaHome> {
             ),
           ),
         );
-        carregarUsuario(); // Recarrega o usuário ao voltar da trilha
+        // --- CÓDIGO EXECUTADO AO VOLTAR DA TrilhaUm ---
+
+        print("PaginaHome: Voltou da TrilhaUm para $tipoModulo.");
+        // Verifica se AINDA está montado DEPOIS de voltar
+        if (mounted) {
+          print(
+            "PaginaHome: Widget ainda montado. Recarregando dados do usuário...",
+          );
+          // Força o recarregamento dos dados do usuário (streak pode ter mudado)
+          // Mostra loading de novo para indicar recarga
+          setState(() => carregando = true);
+          await carregarUsuario(); // Espera carregar os dados
+          // Se precisar recarregar módulos (improvável aqui):
+          // await carregarModulos();
+          print("PaginaHome: Dados do usuário recarregados.");
+          // Esconde loading APÓS recarregar, mas apenas se ainda montado
+          if (mounted) {
+            setState(() => carregando = false);
+            print("PaginaHome: Loading escondido após recarga.");
+          } else {
+            print(
+              "PaginaHome: Widget desmontado DEPOIS de recarregar usuário. Não escondendo loading.",
+            );
+          }
+        } else {
+          print(
+            "PaginaHome: Widget desmontado AO VOLTAR da TrilhaUm. Não recarregando.",
+          );
+        }
+        // --- FIM DO CÓDIGO AO VOLTAR ---
       } else {
-        debugPrint("Erro ao carregar fases do usuário: ${response.body}");
+        // Erro ao buscar perfil
+        print(
+          "PaginaHome: Erro ${response.statusCode} ao buscar perfil em abrirTrilha.",
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                "Erro ${response.statusCode} ao carregar dados da trilha.",
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          setState(() => carregando = false); // Esconde loading
+        }
+      }
+    } catch (e, stacktrace) {
+      // Captura stacktrace para mais detalhes
+      print("PaginaHome: EXCEÇÃO GERAL em abrirTrilha: $e");
+      print(stacktrace); // Imprime o stacktrace
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Erro ao carregar dados: ${response.statusCode}"),
-            backgroundColor: Colors.orange,
+          const SnackBar(
+            content: Text("Erro inesperado ao abrir trilha."),
+            backgroundColor: Colors.red,
           ),
         );
+        setState(() => carregando = false); // Esconde loading
       }
-    } catch (e) {
-      debugPrint("Erro ao abrir trilha: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Erro de conexão. Verifique o servidor."),
-          backgroundColor: Colors.red,
-        ),
-      );
+    } finally {
+      // Garante que o loading saia em caso de erro não pego ou desmontado
+      // Se o widget ainda estiver montado E o loading estiver ativo, desativa.
+      if (mounted && carregando) {
+        print("PaginaHome: Finally: Garantindo que o loading saia.");
+        setState(() => carregando = false);
+      } else if (!mounted) {
+        print("PaginaHome: Finally: Widget desmontado, loading=$carregando.");
+      }
+      print("PaginaHome: Fim de abrirTrilha para $tipoModulo");
     }
   }
 

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'cadastro.dart';
 import 'home.dart'; // Pressupondo que PaginaHome está no arquivo home.dart
+import 'esqueci_senha.dart'; // 🚀 IMPORTAÇÃO ADICIONADA
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -52,16 +53,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  // Função para exibir o Alerta de Desenvolvimento
-  void _showDevelopmentAlert() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Funcionalidade 'Esqueceu a senha' em desenvolvimento."),
-        backgroundColor: Colors.orange,
-        duration: Duration(seconds: 3),
-      ),
-    );
-  }
+  // 🚀 REMOVIDO: A função _showDevelopmentAlert foi removida.
 
   Future<void> loginUser() async {
     setState(() => isLoading = true);
@@ -78,6 +70,9 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
           "senha": senhaController.text.trim(),
         }),
       );
+
+      // Verificação de 'mounted' antes de usar 'context'
+      if (!mounted) return;
 
       final data = jsonDecode(response.body);
 
@@ -100,12 +95,17 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
         );
       }
     } catch (e) {
+      // Verificação de 'mounted'
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Erro de conexão: $e")));
     }
 
-    setState(() => isLoading = false);
+    // Verificação de 'mounted'
+    if (mounted) {
+      setState(() => isLoading = false);
+    }
   }
 
   @override
@@ -194,11 +194,19 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                             const SizedBox(height: 20),
                             _buildPasswordField(),
 
-                            // 🚀 NOVO: Botão Esqueceu a senha
+                            // 🚀 BOTÃO ATUALIZADO
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton(
-                                onPressed: _showDevelopmentAlert,
+                                onPressed: () {
+                                  // 🚀 ALTERADO: Navega para a tela de redefinição
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const EsqueciSenhaPage(),
+                                    ),
+                                  );
+                                },
                                 style: TextButton.styleFrom(
                                   padding: const EdgeInsets.only(
                                     top: 8,
@@ -217,9 +225,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                               ),
                             ),
 
-                            const SizedBox(
-                              height: 15,
-                            ), // Ajustado para dar espaço ao botão "Entrar"
+                            const SizedBox(height: 15),
 
                             AnimatedContainer(
                               duration: const Duration(milliseconds: 400),

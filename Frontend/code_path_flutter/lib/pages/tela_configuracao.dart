@@ -10,7 +10,8 @@ class ConfiguracoesPage extends StatefulWidget {
 }
 
 class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
-  bool modoEscuro = false;
+  // Mantém o estado das configurações
+  bool modoEscuro = false; // Funcionalidade ainda não implementada
   bool notificacoes = true;
   bool somAtivo = true;
 
@@ -18,6 +19,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const Login()),
@@ -28,111 +30,255 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFDFF5E1),
+      extendBodyBehindAppBar:
+          true, // Permite o gradiente ir para trás da AppBar
       appBar: AppBar(
-        backgroundColor: Colors.green.shade700,
-        title: const Text("Configurações"),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+        title: const Text(
+          "Configurações",
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.transparent, // AppBar transparente
+        elevation: 0, // Sem sombra
+        foregroundColor: Colors.white, // Cor dos ícones (seta voltar)
+      ),
+      body: Container(
+        // Fundo gradiente (o mesmo do perfil/login/cadastro)
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFA8E6CF),
+              Color(0xFFDCEDC1),
+              Color(0xFFFFF3B0),
+              Color(0xFFFFD3B6),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: ListView(
+            // Usamos ListView para permitir rolagem
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 20.0,
+            ),
+            children: [
+              // 🔹 Card flutuante para as opções principais
+              _buildModernCard(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Preferências",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2E2E2E),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Opção Modo Escuro
+                    _buildSwitchOption(
+                      title: "Modo escuro",
+                      subtitle: "Ativa o tema noturno (em breve)",
+                      icon: Icons.dark_mode_outlined,
+                      value: modoEscuro,
+                      onChanged: null, // Desabilitado por enquanto
+                      // onChanged: (value) => setState(() => modoEscuro = value),
+                    ),
+                    const Divider(height: 1, indent: 50), // Separador
+                    // Opção Notificações
+                    _buildSwitchOption(
+                      title: "Notificações",
+                      subtitle: "Receber lembretes e dicas",
+                      icon: Icons.notifications_outlined,
+                      value: notificacoes,
+                      onChanged: (value) =>
+                          setState(() => notificacoes = value),
+                    ),
+                    const Divider(height: 1, indent: 50),
+                    // Opção Sons
+                    _buildSwitchOption(
+                      title: "Som e vibração",
+                      subtitle: "Ativa efeitos sonoros do app",
+                      icon: Icons.volume_up_outlined,
+                      value: somAtivo,
+                      onChanged: (value) => setState(() => somAtivo = value),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24), // Espaço entre os cards
+              // 🔹 Card flutuante para Informações e Suporte
+              _buildModernCard(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Sobre e Ajuda",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2E2E2E),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Opção Versão
+                    _buildInfoOption(
+                      title: "Versão do app",
+                      subtitle: "1.0.0 (Beta)",
+                      icon: Icons.info_outline,
+                      onTap: () {}, // Nenhuma ação por enquanto
+                    ),
+                    const Divider(height: 1, indent: 50),
+                    // Opção Suporte
+                    _buildInfoOption(
+                      title: "Ajuda e Suporte",
+                      subtitle: "Entre em contato conosco",
+                      icon: Icons.help_outline,
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Função em desenvolvimento..."),
+                          ),
+                        );
+                      },
+                    ),
+                    const Divider(height: 1, indent: 50),
+                    // Opção Política
+                    _buildInfoOption(
+                      title: "Política de Privacidade",
+                      icon: Icons.privacy_tip_outlined,
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Página de política em breve..."),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 40),
+
+              // 🔹 Botão de Logout (estilo similar ao login)
+              ElevatedButton.icon(
+                onPressed: _logout,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade400,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 4, // Sombra
+                  shadowColor: Colors.black.withOpacity(0.3),
+                ),
+                icon: const Icon(Icons.logout),
+                label: const Text(
+                  "Sair da conta",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+              const SizedBox(height: 20), // Espaço no final
+            ],
+          ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const SizedBox(height: 10),
+    );
+  }
 
-          // 🔹 Tema
-          SwitchListTile(
-            title: const Text("Modo escuro"),
-            subtitle: const Text("Ativa o tema noturno"),
-            activeColor: Colors.green,
-            value: modoEscuro,
-            onChanged: (value) {
-              setState(() => modoEscuro = value);
-            },
-            secondary: const Icon(Icons.dark_mode),
-          ),
-          const Divider(),
+  // --- Widgets Auxiliares ---
 
-          // 🔹 Notificações
-          SwitchListTile(
-            title: const Text("Notificações"),
-            subtitle: const Text("Receber lembretes e dicas"),
-            activeColor: Colors.green,
-            value: notificacoes,
-            onChanged: (value) {
-              setState(() => notificacoes = value);
-            },
-            secondary: const Icon(Icons.notifications),
-          ),
-          const Divider(),
-
-          // 🔹 Sons
-          SwitchListTile(
-            title: const Text("Som e vibração"),
-            subtitle: const Text("Ativa sons do app"),
-            activeColor: Colors.green,
-            value: somAtivo,
-            onChanged: (value) {
-              setState(() => somAtivo = value);
-            },
-            secondary: const Icon(Icons.volume_up),
-          ),
-          const Divider(),
-
-          // 🔹 Versão
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text("Versão do app"),
-            subtitle: const Text("1.0.0 (Beta)"),
-            onTap: () {},
-          ),
-          const Divider(),
-
-          // 🔹 Suporte
-          ListTile(
-            leading: const Icon(Icons.help_outline),
-            title: const Text("Ajuda e Suporte"),
-            subtitle: const Text("Entre em contato com o suporte"),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Função em desenvolvimento...")),
-              );
-            },
-          ),
-          const Divider(),
-
-          // 🔹 Política
-          ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text("Política de Privacidade"),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Página de política em breve...")),
-              );
-            },
-          ),
-          const SizedBox(height: 30),
-
-          // 🔹 Botão de Logout
-          ElevatedButton.icon(
-            onPressed: _logout,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade400,
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            icon: const Icon(Icons.logout),
-            label: const Text(
-              "Sair da conta",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+  // Constrói o card branco flutuante (reutilizado do perfil)
+  Widget _buildModernCard(Widget child) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 12,
+      ), // Padding interno ajustado
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.85), // Um pouco mais opaco
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            spreadRadius: 0,
+            blurRadius: 15,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
+      child: child,
+    );
+  }
+
+  // Widget para opções com Switch
+  Widget _buildSwitchOption({
+    required String title,
+    String? subtitle,
+    required IconData icon,
+    required bool value,
+    required ValueChanged<bool>? onChanged, // Permite desabilitar
+  }) {
+    return SwitchListTile(
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.w500,
+          color: Color(0xFF2E2E2E),
+        ),
+      ),
+      subtitle: subtitle != null
+          ? Text(
+              subtitle,
+              style: const TextStyle(color: Colors.black54, fontSize: 13),
+            )
+          : null,
+      secondary: Icon(icon, color: Colors.black54), // Ícone à esquerda
+      activeColor: const Color(0xFF3CB371), // Cor verde quando ativo
+      value: value,
+      onChanged: onChanged, // Usa o callback passado
+      contentPadding: const EdgeInsets.symmetric(
+        vertical: 4,
+      ), // Ajusta padding vertical
+    );
+  }
+
+  // Widget para opções informativas (sem Switch)
+  Widget _buildInfoOption({
+    required String title,
+    String? subtitle,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.black54), // Ícone à esquerda
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.w500,
+          color: Color(0xFF2E2E2E),
+        ),
+      ),
+      subtitle: subtitle != null
+          ? Text(
+              subtitle,
+              style: const TextStyle(color: Colors.black54, fontSize: 13),
+            )
+          : null,
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(
+        vertical: 4,
+        horizontal: 16,
+      ), // Ajusta padding
+      dense: true, // Torna o ListTile mais compacto
     );
   }
 }

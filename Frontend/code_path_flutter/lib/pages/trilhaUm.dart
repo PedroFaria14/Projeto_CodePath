@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'faseUmTrilha1.dart'; // tela da fase (QuestaoPage)
 
-class TrilhaUm extends StatelessWidget {
+class TrilhaUm extends StatefulWidget {
   final String tipoModulo;
   final List fases;
   final String backgroundAsset;
@@ -21,157 +21,272 @@ class TrilhaUm extends StatelessWidget {
     required this.tipoModuloAPI,
   });
 
-  // A função _tag (para o gato) continua igual
+  @override
+  State<TrilhaUm> createState() => _TrilhaUmState();
+}
+
+class _TrilhaUmState extends State<TrilhaUm> {
+  late List _fasesAtuais;
+  late int _indiceAtual;
+
+  @override
+  void initState() {
+    super.initState();
+    print("TrilhaUm initState"); // Log
+    _atualizarFases(widget.fases);
+  }
+
+  void _atualizarFases(List novasFases) {
+    if (!mounted) {
+      print(
+        "TrilhaUm: Tentativa de atualizar estado, mas widget não está montado.",
+      ); // Log
+      return;
+    }
+    setState(() {
+      _fasesAtuais = List<Map<String, dynamic>>.from(
+        novasFases.map((f) {
+          if (f is Map) {
+            return Map<String, dynamic>.from(f);
+          } else {
+            print("TrilhaUm: Item inesperado na lista de fases recebida: $f");
+            return <String, dynamic>{};
+          }
+        }),
+      );
+      _indiceAtual = _fasesAtuais.indexWhere(
+        (f) => f.containsKey("atual") && f["atual"] == true,
+      );
+      print("TrilhaUm State Updated: Novas fases: $_fasesAtuais"); // Log
+      print("TrilhaUm State Updated: Novo índice atual: $_indiceAtual"); // Log
+    });
+  }
+
   Widget _tag(String texto) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.green.shade800,
+        color: Colors.green.shade800.withOpacity(0.85),
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Text(
         texto,
-        style: const TextStyle(color: Colors.white, fontSize: 12),
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
 
+  Future<void> _navegarParaQuestao(Map<String, dynamic> fase) async {
+    print(
+      "TrilhaUm: Navegando para QuestaoPage para fase ID: ${fase['id']}",
+    ); // Log
+    if (!mounted) {
+      print(
+        "TrilhaUm: Tentativa de navegar, mas widget não está montado.",
+      ); // Log
+      return;
+    }
+    final resultado = await Navigator.push<List<dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => QuestaoPage(
+          faseId: fase["id"],
+          tipoModulo: widget.tipoModuloAPI,
+          tipoModuloDisplay: widget.tipoModulo,
+          backgroundAsset: widget.backgroundAsset,
+          posicoes: widget.posicoes,
+          animalAsset: widget.animalAsset,
+          gradientColors: widget.gradientColors,
+        ),
+      ),
+    );
+
+    print("TrilhaUm: Retornou da QuestaoPage. Resultado: $resultado"); // Log
+
+    if (resultado != null && resultado is List && mounted) {
+      print(
+        "TrilhaUm: QuestaoPage retornou fases atualizadas. Atualizando estado.",
+      ); // Log
+      _atualizarFases(resultado);
+    } else if (mounted) {
+      print(
+        "TrilhaUm: QuestaoPage retornou nulo ou tipo inesperado (${resultado?.runtimeType}). Estado não atualizado.",
+      ); // Log
+    } else {
+      print(
+        "TrilhaUm: Retornou da QuestaoPage, mas widget não está mais montado.",
+      ); // Log
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final int currentNodex = fases.indexWhere((f) => f["atual"] == true);
+    print(
+      "TrilhaUm build: Índice atual: $_indiceAtual, Contagem de fases: ${_fasesAtuais.length}",
+    ); // Log
 
     return Scaffold(
-      // 1. 🚀 CORREÇÃO: REMOVEMOS o 'extendBodyBehindAppBar: true'
-
-      // 2. 🚀 CORREÇÃO: Este é o AppBar novo e correto
       appBar: AppBar(
-        // Botão de voltar branco
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
+            print(
+              "TrilhaUm: Botão voltar pressionado. Voltando para PaginaHome.",
+            ); // Log
             Navigator.pop(context);
           },
         ),
-
-        // Título com a imagem do animal
         title: Row(
           children: [
-            Image.asset(
-              animalAsset, // Usa a foto do animal
-              height: 40,
-            ),
+            Image.asset(widget.animalAsset, height: 40),
             const SizedBox(width: 10),
-
             Expanded(
               child: Text(
-                tipoModulo,
+                widget.tipoModulo,
                 style: const TextStyle(
-                  color: Colors.white, // Texto branco
+                  color: Colors.white,
                   fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
         ),
-
-        // O degradê (flexibleSpace) vai AQUI DENTRO
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: gradientColors, // Usa as cores do módulo
+              colors: widget.gradientColors,
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ),
           ),
         ),
+        elevation: 2,
       ),
-
-      // O 'flexibleSpace' que estava aqui fora foi removido.
       body: LayoutBuilder(
         builder: (context, constraints) {
+          if (_fasesAtuais.isEmpty || widget.posicoes.isEmpty) {
+            print("TrilhaUm build: Lista de fases ou posições vazia."); // Log
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.asset(widget.backgroundAsset, fit: BoxFit.cover),
+                ),
+                const Center(
+                  child: Card(
+                    color: Colors.black54,
+                    child: Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: Text(
+                        "Nenhuma fase encontrada para este módulo.",
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+
           return Stack(
             children: [
-              // IMAGEM DE FUNDO (Continua igual)
               Positioned.fill(
-                child: Image.asset(backgroundAsset, fit: BoxFit.cover),
+                child: Image.asset(widget.backgroundAsset, fit: BoxFit.cover),
               ),
 
-              // LÓGICA DE ÍCONES (Continua igual)
-              ...fases.asMap().entries.map((entry) {
+              ..._fasesAtuais.asMap().entries.map((entry) {
                 final i = entry.key;
                 final fase = entry.value;
-                final pos = posicoes[i % posicoes.length];
+                final posIndex = i % widget.posicoes.length;
+                final pos = widget.posicoes[posIndex];
 
-                final bool isCurrent = i == currentNodex;
+                final bool isCurrent = i == _indiceAtual;
                 final bool estaLiberada = fase["liberada"] == true;
 
                 Widget iconeCentral;
-                Widget? tag;
+                Widget? tagWidget;
 
-                if (isCurrent) {
+                if (isCurrent && estaLiberada) {
                   iconeCentral = Image.asset(
                     "assets/imagens/gato1.png",
                     height: 60,
                   );
-                  tag = Positioned(top: -30, child: _tag("Você está aqui"));
+                  tagWidget = Positioned(
+                    top: -25,
+                    left: -30,
+                    right: -30,
+                    child: Center(child: _tag("Você está aqui")),
+                  );
                 } else if (estaLiberada) {
                   iconeCentral = const Icon(
-                    Icons.star,
+                    Icons.star_rounded,
                     color: Color(0xFFFBC02D),
                     size: 45,
                     shadows: [Shadow(color: Colors.black54, blurRadius: 4.0)],
                   );
-                  tag = null;
                 } else {
                   iconeCentral = const Icon(
-                    Icons.lock,
-                    color: Colors.white,
+                    Icons.lock_rounded,
+                    color: Colors.white70,
                     size: 35,
                     shadows: [Shadow(color: Colors.black54, blurRadius: 4.0)],
                   );
-                  tag = null;
                 }
 
-                // Posiciona o grupo (Ícone + Tag) na tela
-                return Positioned(
-                  left: constraints.maxWidth * pos.dx - 35,
-                  top: constraints.maxHeight * pos.dy - 35,
+                final double iconSize = isCurrent ? 60.0 : 45.0;
+                final double clickableSize = 70.0;
+                final leftPos =
+                    constraints.maxWidth * pos.dx - (clickableSize / 2);
+                final topPos =
+                    constraints.maxHeight * pos.dy - (clickableSize / 2);
+                final safeLeft = leftPos.clamp(
+                  5.0,
+                  constraints.maxWidth - clickableSize - 5.0,
+                );
+                final safeTop = topPos.clamp(
+                  5.0,
+                  constraints.maxHeight - clickableSize - 5.0,
+                );
 
+                return Positioned(
+                  left: safeLeft,
+                  top: safeTop,
                   child: GestureDetector(
                     onTap: estaLiberada
-                        ? () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => QuestaoPage(
-                                  faseId: fase["id"],
-                                  tipoModulo: tipoModuloAPI,
-                                  tipoModuloDisplay: tipoModulo,
-                                  backgroundAsset: backgroundAsset,
-                                  posicoes: posicoes,
-
-                                  // 3. 🚀 CORREÇÃO: Passando os novos dados
-                                  animalAsset: animalAsset,
-                                  gradientColors: gradientColors,
-                                ),
-                              ),
-                            );
-                          }
+                        ? () => _navegarParaQuestao(fase)
                         : null,
-
-                    // O "alvo" clicável (Continua igual)
-                    child: Stack(
-                      alignment: Alignment.center,
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(
-                          width: 70,
-                          height: 70,
-                          color: Colors.transparent,
+                    child: MouseRegion(
+                      cursor: estaLiberada
+                          ? SystemMouseCursors.click
+                          : SystemMouseCursors.basic,
+                      child: Container(
+                        width: clickableSize,
+                        height: clickableSize,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          clipBehavior: Clip.none,
+                          children: [
+                            // 🚀 REMOVIDA AQUI: A secção que criava a "bola branca" / efeito de brilho
+                            // if(estaLiberada) Container(...) foi removida.
+                            iconeCentral,
+                            if (tagWidget != null) tagWidget,
+                          ],
                         ),
-                        iconeCentral,
-                        if (tag != null) tag,
-                      ],
+                      ),
                     ),
                   ),
                 );
@@ -181,5 +296,11 @@ class TrilhaUm extends StatelessWidget {
         },
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    print("TrilhaUm dispose"); // Log
+    super.dispose();
   }
 }
