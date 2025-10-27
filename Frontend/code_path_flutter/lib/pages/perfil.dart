@@ -44,7 +44,7 @@ class _PerfilPageState extends State<PerfilPage> {
 
     try {
       final response = await http.get(
-        Uri.parse("http://10.0.2.2:8000/profile/$email"),
+        Uri.parse("https://projeto-codepath.onrender.com/profile/$email"),
       );
 
       if (!mounted) return; // Verifica se o widget ainda está montado

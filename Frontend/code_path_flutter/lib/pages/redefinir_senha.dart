@@ -32,7 +32,7 @@ class _RedefinirSenhaPageState extends State<RedefinirSenhaPage> {
     try {
       // Chama o endpoint do Python para SALVAR a nova senha
       final response = await http.post(
-        Uri.parse("http://10.0.2.2:8000/reset-password"),
+        Uri.parse("https://projeto-codepath.onrender.com/reset-password"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "email": widget.email,

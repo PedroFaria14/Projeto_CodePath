@@ -67,7 +67,9 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
     try {
       // Chama o endpoint de atualização no backend
       final response = await http.put(
-        Uri.parse("http://10.0.2.2:8000/update_profile/$email"),
+        Uri.parse(
+          "https://projeto-codepath.onrender.com/update_profile/$email",
+        ),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "nome": _nomeController.text.trim(),

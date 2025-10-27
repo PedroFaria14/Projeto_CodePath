@@ -214,7 +214,7 @@ class _PaginaHomeState extends State<PaginaHome> {
     List<String> modulosDaApi = [];
     try {
       final response = await http.get(
-        Uri.parse("http://10.0.2.2:8000/modulos"),
+        Uri.parse("https://projeto-codepath.onrender.com/modulos"),
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -263,7 +263,7 @@ class _PaginaHomeState extends State<PaginaHome> {
       for (int i = 0; i < maxTentativas; i++) {
         // Tenta buscar o perfil
         final response = await http.get(
-          Uri.parse("http://10.0.2.2:8000/profile/$email"),
+          Uri.parse("https://projeto-codepath.onrender.com/profile/$email"),
         );
 
         if (response.statusCode == 200) {
@@ -383,7 +383,7 @@ class _PaginaHomeState extends State<PaginaHome> {
       );
       // Busca o perfil para pegar as fases ATUAIS antes de navegar
       final response = await http.get(
-        Uri.parse("http://10.0.2.2:8000/profile/$email"),
+        Uri.parse("https://projeto-codepath.onrender.com/profile/$email"),
       );
 
       // Verifica se ainda está montado APÓS a chamada async

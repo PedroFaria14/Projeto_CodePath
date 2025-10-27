@@ -206,7 +206,7 @@ class _QuestaoPageState extends State<QuestaoPage> {
 
       final response = await http.get(
         Uri.parse(
-          "http://10.0.2.2:8000/pergunta/?nivel=$nivelFirebase&tipo=${Uri.encodeComponent(widget.tipoModulo)}&count=$count",
+          "https://projeto-codepath.onrender.com/pergunta/?nivel=$nivelFirebase&tipo=${Uri.encodeComponent(widget.tipoModulo)}&count=$count",
         ),
       );
 
@@ -344,7 +344,7 @@ class _QuestaoPageState extends State<QuestaoPage> {
       // --- Lógica para buscar perfil e calcular novas fases ---
       print("QuestaoPage: Buscando perfil atual para $email"); // Log
       final profileResp = await http.get(
-        Uri.parse("http://10.0.2.2:8000/profile/$email"),
+        Uri.parse("https://projeto-codepath.onrender.com/profile/$email"),
       );
 
       if (!mounted) return;
@@ -441,7 +441,7 @@ class _QuestaoPageState extends State<QuestaoPage> {
       ); // Log
 
       final saveResp = await http.post(
-        Uri.parse("http://10.0.2.2:8000/salvar_progresso"),
+        Uri.parse("https://projeto-codepath.onrender.com/salvar_progresso"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(payload),
       );
@@ -507,7 +507,7 @@ class _QuestaoPageState extends State<QuestaoPage> {
 
     try {
       final response = await http.post(
-        Uri.parse("http://10.0.2.2:8000/responder"),
+        Uri.parse("https://projeto-codepath.onrender.com/responder"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "idPergunta": idPergunta,

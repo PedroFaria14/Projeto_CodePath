@@ -84,7 +84,9 @@ class _CadastroState extends State<Cadastro> {
     setState(() => isLoading = true);
 
     try {
-      final url = Uri.parse("http://10.0.2.2:8000/register"); // Seu endpoint
+      final url = Uri.parse(
+        "https://projeto-codepath.onrender.com/register",
+      ); // Seu endpoint
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},

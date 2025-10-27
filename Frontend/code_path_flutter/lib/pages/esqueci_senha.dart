@@ -25,7 +25,9 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
     try {
       // Chama o endpoint do Python para PEDIR o código
       final response = await http.post(
-        Uri.parse("http://10.0.2.2:8000/request-password-reset"),
+        Uri.parse(
+          "https://projeto-codepath.onrender.com/request-password-reset",
+        ),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"email": _emailController.text.trim()}),
       );
