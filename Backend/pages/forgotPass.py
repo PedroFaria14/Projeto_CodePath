@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Body
-from pydantic import BaseModel, EmailStr
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from firebase_config import db # Sua configuração do Firestore
 import datetime
@@ -7,6 +6,7 @@ import secrets # Para gerar tokens seguros
 import os
 from dotenv import load_dotenv
 import bcrypt # 🚀 IMPORTANTE: Para o hash da nova senha
+from pydantic import BaseModel, EmailStr, SecretStr
 
 # Carrega variáveis do arquivo .env
 load_dotenv()
