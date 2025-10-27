@@ -37,6 +37,11 @@ app = FastAPI(title="CodePath API", description="API para o aplicativo CodePath.
 
 # --- Endpoints da API ---
 
+@app.get("/")
+def root():
+    return {"status": "online", "message": "API CodePath funcionando com sucesso 🚀"}
+
+
 app.include_router(register_router)
 app.include_router(login_router)
 app.include_router(update_nivel_router)
