@@ -2,35 +2,32 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import datetime
 from firebase_config import db
-import bcrypt # 1. IMPORTADO O BCRYPT
+import bcrypt 
 
 router = APIRouter()
 
-# Modelo de dados para login
+# (Modelos UserLogin e ApiResponse)
 class UserLogin(BaseModel):
     email: str
-    senha: str # O usuário ainda envia a senha pura
+    senha: str
 
-# Modelo de resposta
 class ApiResponse(BaseModel):
     success: bool
     message: str
     user: dict = None
 
-
-
+# (Funções hash_password e verify_password)
 def hash_password(password: str) -> str:
     """Gera o hash de uma senha."""
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
     return hashed.decode('utf-8')
 
-# 3. FUNÇÃO DE VERIFICAÇÃO (Você já tem)
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verifica se a senha pura bate com o hash."""
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
-# (Sua constante INITIAL_FASES - mantenha como está)
+# (Sua constante INITIAL_FASES)
 INITIAL_FASES = {
     # ... (cole sua constante INITIAL_FASES aqui) ...
 }
@@ -50,24 +47,37 @@ async def login_user(user: UserLogin):
         user_doc = query[0]
         user_data = user_doc.to_dict()
 
-        # 3. VERIFICAR SE O HASH EXISTE
-        if 'senha_hash' not in user_data:
-            # Fallback para usuários antigos sem hash (OPCIONAL, mas recomendado)
-            if 'senha' in user_data and user_data['senha'] == user.senha:
-                 # Se a senha antiga (sem hash) bater, crie um hash para ela agora
-                user_doc.reference.update({'senha_hash': hash_password(user.senha)})
-                # (Continue o login normalmente)
-                pass
-            else:
-                raise HTTPException(status_code=401, detail="Email ou senha incorretos.")
-
-        # 4. COMPARAR A SENHA USANDO BCRYPT
-        if not verify_password(user.senha, user_data.get('senha_hash', '')):
-            raise HTTPException(status_code=401, detail="Email ou senha incorretos.")
+        # --- LÓGICA DE VERIFICAÇÃO DE SENHA CORRIGIDA ---
+        
+        login_sucesso = False # Flag para controlar o login
+        
+        if 'senha_hash' in user_data:
+            # --- Caminho 1: Usuário novo (com hash) ---
+            if verify_password(user.senha, user_data['senha_hash']):
+                login_sucesso = True
             
+        elif 'senha' in user_data:
+            # --- Caminho 2: Usuário antigo (sem hash) ---
+            if user_data['senha'] == user.senha:
+                # Senha antiga (texto puro) bateu.
+                # Atualiza o banco com o hash para o futuro.
+                user_doc.reference.update({'senha_hash': hash_password(user.senha)})
+                login_sucesso = True
+                
+                # (Opcional: Adicionar o hash ao user_data para a lógica de 'fases' funcionar)
+                user_data['senha_hash'] = hash_password(user.senha)
+
+        if not login_sucesso:
+            # Se nenhum dos caminhos deu certo, o login falha.
+            raise HTTPException(status_code=401, detail="Email ou senha incorretos.")
+
+        # --- FIM DA LÓGICA DE SENHA ---
+        
+        # Se o código chegou até aqui, o login foi bem-sucedido.
+        
         # --- Lógica do streak (mantida) ---
-        # ... (todo o seu código de streak continua aqui) ...
         today = datetime.date.today()
+        # ... (resto da sua lógica de streak) ...
         last_login = user_data.get('last_login')
         streak = user_data.get('streak', 0)
 
@@ -93,10 +103,12 @@ async def login_user(user: UserLogin):
         })
 
         user_data['streak'] = streak
-        user_data.pop('senha', None)      # Remove o campo 'senha' (se existir)
-        user_data.pop('senha_hash', None) # Remove o hash da resposta
+        user_data.pop('senha', None)
+        user_data.pop('senha_hash', None)
 
         return {"success": True, "message": "Login bem-sucedido!", "user": user_data}
 
     except Exception as e:
+        # Isso vai capturar o 'Invalid salt' se ele acontecer de novo
+        # e informar o frontend
         raise HTTPException(status_code=500, detail=f"Ocorreu um erro ao verificar o login: {e}")
