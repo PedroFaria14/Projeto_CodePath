@@ -3,7 +3,8 @@ from pydantic import BaseModel, Field, EmailStr
 import datetime
 import re
 from firebase_config import db
-from google.cloud.firestore_v1 import FieldFilter  # ✅ Import necessário
+from google.cloud.firestore_v1 import FieldFilter
+import bcrypt # 1. IMPORTADO O BCRYPT
 
 router = APIRouter()
 
@@ -11,20 +12,39 @@ class UserRegister(BaseModel):
     nome: str = Field(..., min_length=2)
     email: EmailStr
     senha: str = Field(..., min_length=6)
-    data_nascimento: datetime.date = Field(...)  # formato YYYY-MM-DD
+    data_nascimento: datetime.date = Field(...)
     telefone: str = Field(..., min_length=10, max_length=17)
 
 class ApiResponse(BaseModel):
     success: bool
     message: str
+    
+# 2. FUNÇÃO DE HASH ADICIONADA
+def hash_password(password: str) -> str:
+    """Gera o hash de uma senha."""
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
 
-INITIAL_FASES = [
-    {"id": 1, "liberada": True, "atual": True},
-    {"id": 2, "liberada": False, "atual": False},
-    {"id": 3, "liberada": False, "atual": False},
-    {"id": 4, "liberada": False, "atual": False},
-    {"id": 5, "liberada": False, "atual": False},
-]
+# (Sua constante INITIAL_FASES - mantenha como está)
+INITIAL_FASES = {
+    "Laços de Repetição": [
+        {"id": 1, "liberada": True, "atual": True},
+        {"id": 2, "liberada": False, "atual": False},
+        {"id": 3, "liberada": False, "atual": False}
+    ],
+    "Condicionais": [
+        {"id": 1, "liberada": True, "atual": True},
+        {"id": 2, "liberada": False, "atual": False},
+        {"id": 3, "liberada": False, "atual": False}
+    ],
+    "Variáveis": [
+        {"id": 1, "liberada": True, "atual": True},
+        {"id": 2, "liberada": False, "atual": False},
+        {"id": 3, "liberada": False, "atual": False}
+    ]
+}
+
 
 @router.post("/register", response_model=ApiResponse)
 async def register_user(user: UserRegister):
@@ -42,28 +62,31 @@ async def register_user(user: UserRegister):
     try:
         users_ref = db.collection('usuarios')
 
-        # ✅ Versão nova e correta do filtro
         query = users_ref.where(filter=FieldFilter('email', '==', user.email)).limit(1).stream()
         existing_users = list(query)
 
         if len(existing_users) > 0:
             raise HTTPException(status_code=400, detail="Este email já está cadastrado.")
 
-        # ✅ Converter date → datetime
         data_nasc_datetime = datetime.datetime.combine(
             user.data_nascimento, datetime.datetime.min.time()
         )
+        
+        # 3. GERAR O HASH DA SENHA
+        hashed_password = hash_password(user.senha)
 
         user_data = {
             "nome": user.nome,
             "data_nascimento": data_nasc_datetime,
             "telefone": telefone_limpo,
             "email": user.email,
-            "senha": user.senha,
+            # 4. SALVAR O HASH, NÃO A SENHA PURA
+            "senha_hash": hashed_password, 
+            # "senha": user.senha, # <- LINHA ANTIGA REMOVIDA
             "streak": 1,
             "last_login": datetime.datetime.utcnow(),
             "nivel": "iniciante",
-            "fases": INITIAL_FASES,
+            "fases": INITIAL_FASES, # Use o formato de mapa aninhado
         }
 
         users_ref.add(user_data)
