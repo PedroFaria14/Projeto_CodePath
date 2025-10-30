@@ -54,49 +54,110 @@ async def get_persona_by_tipo(tipo_exercicio: str):
     return FALLBACK_PERSONA
 
 
-# buscar pergunta aleatória por nível
+import random
+from typing import Optional
+from collections import defaultdict # 👈 ADICIONADO
+from fastapi import APIRouter, HTTPException
+from google.cloud.firestore_v1.base_query import FieldFilter
+
+from .. import db # Verifique se seu 'db' vem daqui
+from ..models.api_response import ApiResponseQuestions # Verifique o caminho do seu model
+
+router = APIRouter()
+
+#
+# 👇 SEU CÓDIGO COMEÇA AQUI 👇
+#
+
+# buscar pergunta por nível (e opcionalmente por tipo)
 @router.get("/pergunta/", response_model=ApiResponseQuestions)
-async def get_pergunta(nivel: str, tipo: str, count: int = 3): # 💥 CORREÇÃO: Recebe 'count'
+async def get_pergunta(
+    nivel: str, 
+    count: int = 3, 
+    tipo: Optional[str] = None  # 👈 MUDANÇA 1: 'tipo' agora é opcional
+):
     try:
         mapa_niveis = {
             "iniciante": "Facil",
             "intermediario": "Medio",
             "avancado": "Dificil"
         }
-        nivel = mapa_niveis.get(nivel.lower(), nivel)
+        nivel_convertido = mapa_niveis.get(nivel.lower(), nivel)
 
-        perguntas_ref = db.collection("perguntas").where(
-            filter=FieldFilter("nivel", "==", nivel)
-        ).where(
-            filter=FieldFilter("tipo", "==", tipo)
-        )
+        perguntas_selecionadas = []
 
-        docs = perguntas_ref.get()
-        perguntas = [doc.to_dict() for doc in docs]
-
-        if not perguntas:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Nenhuma pergunta encontrada para {nivel} e {tipo}"
+        # 👇 MUDANÇA 2: Lógica condicional
+        if tipo:
+            # --- CASO 1: MÓDULO NORMAL (TIPO FOI FORNECIDO) ---
+            print(f"📡 Buscando por TIPO: {tipo}, Nível: {nivel_convertido}")
+            
+            perguntas_ref = db.collection("perguntas").where(
+                filter=FieldFilter("nivel", "==", nivel_convertido)
+            ).where(
+                filter=FieldFilter("tipo", "==", tipo)
             )
-        
-        # LÓGICA DE QUIZ: Embaralha e pega as 'count' primeiras perguntas
-        random.shuffle(perguntas)
-        
-        num_perguntas = min(count, len(perguntas))
-        perguntas_selecionadas = perguntas[:num_perguntas]
+            docs = perguntas_ref.get()
+            perguntas = [doc.to_dict() for doc in docs]
+
+            if not perguntas:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Nenhuma pergunta encontrada para {nivel} e {tipo}"
+                )
+            
+            random.shuffle(perguntas)
+            num_a_pegar = min(count, len(perguntas))
+            perguntas_selecionadas = perguntas[:num_a_pegar]
+
+        else:
+            # --- CASO 2: DESAFIO DA MISTURA (TIPO NÃO FOI FORNECIDO) ---
+            print(f"📡 Buscando MISTURADO, Nível: {nivel_convertido}")
+
+            # 1. Busca TODAS as perguntas daquele nível
+            perguntas_ref = db.collection("perguntas").where(
+                filter=FieldFilter("nivel", "==", nivel_convertido)
+            )
+            docs = perguntas_ref.get()
+            todas_perguntas_nivel = [doc.to_dict() for doc in docs]
+
+            if not todas_perguntas_nivel:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Nenhuma pergunta encontrada para o nível {nivel}"
+                )
+
+            # 2. Agrupa as perguntas por tipo
+            perguntas_por_tipo = defaultdict(list)
+            for p in todas_perguntas_nivel:
+                if p.get("tipo"):
+                    perguntas_por_tipo[p.get("tipo")].append(p)
+
+            # 3. Pega UMA pergunta aleatória de CADA tipo
+            lista_misturada = []
+            for tipo_key, lista_p in perguntas_por_tipo.items():
+                if lista_p:
+                    lista_misturada.append(random.choice(lista_p))
+            
+            # 4. Embaralha a lista final e pega 'count' perguntas
+            random.shuffle(lista_misturada)
+            num_a_pegar = min(count, len(lista_misturada))
+            perguntas_selecionadas = lista_misturada[:num_a_pegar]
+
+        # --- RESPOSTA (serve para os dois casos) ---
         
         if not perguntas_selecionadas:
              raise HTTPException(
                 status_code=404,
-                detail=f"Nenhuma pergunta encontrada para {nivel} e {tipo}"
+                detail=f"Nenhuma pergunta selecionada após o filtro."
             )
-        
+                
+        num_perguntas = len(perguntas_selecionadas)
         return ApiResponseQuestions(
             success=True,
             message=f"{num_perguntas} perguntas encontradas",
             perguntas=perguntas_selecionadas
         )
+        
     except HTTPException as e:
         raise e
     except Exception as e:
