@@ -1,4 +1,5 @@
 import random
+from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from firebase_config import db
@@ -54,22 +55,6 @@ async def get_persona_by_tipo(tipo_exercicio: str):
     return FALLBACK_PERSONA
 
 
-import random
-from typing import Optional
-from collections import defaultdict # 👈 ADICIONADO
-from fastapi import APIRouter, HTTPException
-from google.cloud.firestore_v1.base_query import FieldFilter
-
-from .. import db # Verifique se seu 'db' vem daqui
-from ..models.api_response import ApiResponseQuestions # Verifique o caminho do seu model
-
-router = APIRouter()
-
-#
-# 👇 SEU CÓDIGO COMEÇA AQUI 👇
-#
-
-# buscar pergunta por nível (e opcionalmente por tipo)
 @router.get("/pergunta/", response_model=ApiResponseQuestions)
 async def get_pergunta(
     nivel: str, 
