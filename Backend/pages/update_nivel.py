@@ -54,7 +54,6 @@ async def update_user_level(data: UpdateUserLevel):
         raise HTTPException(status_code=500, detail="Ocorreu um erro interno no servidor.")
 
 
-
 @router.post("/profile/set-global-level", response_model=ApiResponseProfileUpdate)
 async def set_global_level(request: GlobalLevelSetRequest):
     """
@@ -65,8 +64,16 @@ async def set_global_level(request: GlobalLevelSetRequest):
         user_ref = db.collection("usuarios").where(
             filter=FieldFilter("email", "==", request.email)
         ).limit(1)
-        user_docs = user_ref.get()
-        user_doc = next(user_docs, None)
+        
+        # 👇 CORREÇÃO APLICADA AQUI 👇
+        # Usando a mesma lógica de lista do seu endpoint /update_nivel
+        user_docs = user_ref.get() # .get() retorna uma LISTA
+
+        if len(user_docs) > 0:
+            user_doc = user_docs[0] # Pega o primeiro item da LISTA
+        else:
+            user_doc = None
+        # 👆 FIM DA CORREÇÃO 👆
 
         if not user_doc:
             raise HTTPException(status_code=404, detail="Usuário não encontrado")
