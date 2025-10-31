@@ -6,7 +6,7 @@ from firebase_config import db
 from scripts.gemini import gerar_explicacao
 from google.cloud.firestore_v1.base_query import FieldFilter
 import re 
-import random 
+from collections import defaultdict
 
 router = APIRouter()
 
@@ -59,7 +59,7 @@ async def get_persona_by_tipo(tipo_exercicio: str):
 async def get_pergunta(
     nivel: str, 
     count: int = 3, 
-    tipo: Optional[str] = None  # 👈 MUDANÇA 1: 'tipo' agora é opcional
+    tipo: Optional[str] = None  
 ):
     try:
         mapa_niveis = {
@@ -220,6 +220,60 @@ async def responder(resposta: RespostaUsuario):
     except Exception as e:
         print(f"Erro inesperado no responder: {e}")
         raise HTTPException(status_code=500, detail=f"Erro interno no servidor: {e}")
+
+
+@router.post("/responderSite", response_model=ApiResponse)
+async def responder_site(resposta: RespostaUsuario): # 1. Nome da função alterado
+    try:
+        # 1. Busca a pergunta
+        docs = db.collection("perguntas").where(
+            filter=FieldFilter("idPergunta", "==", resposta.idPergunta)
+        ).limit(1).stream()
+        doc = next(docs, None)
+
+        if not doc:
+            raise HTTPException(status_code=404, detail="Pergunta não encontrada")
+
+        pergunta = doc.to_dict()
+        correta = pergunta["resposta_correta"]
+
+        # 2. Valida resposta
+        acertou = resposta.resposta == correta
+        
+        explicacao_limpa = "" # Inicializa a variável
+
+        # --- LÓGICA MODIFICADA (SEM IA) ---
+        if acertou:
+            # 3.a. Se ACERTOU, define uma mensagem de parabéns.
+            mensagens_sucesso = [
+                "Muito bem! Resposta correta.",
+                "Parabéns, é isso mesmo!",
+                "Exato! Continue assim.",
+                "Você acertou! 🎉"
+            ]
+            explicacao_limpa = random.choice(mensagens_sucesso)
+        
+        else:
+            # 3.b. Se ERROU, apenas informa a resposta correta.
+            # (TODA A LÓGICA DE IA FOI REMOVIDA DAQUI)
+            explicacao_limpa = f"Ops, você errou. A resposta correta era: {correta}"
+        # --- FIM DA LÓGICA MODIFICADA ---
+
+        # 4. Retorna a resposta
+        return ApiResponse(
+            success=acertou,
+            message="Resposta correta 🎉" if acertou else "Resposta incorreta ❌",
+            explicacao=explicacao_limpa 
+        )
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        # Adicionei 'Site' no log de erro para você saber qual endpoint falhou
+        print(f"Erro inesperado no responderSite: {e}") 
+        raise HTTPException(status_code=500, detail=f"Erro interno no servidor: {e}")
+
+#
     
 @router.get("/modulos")
 async def listar_modulos():

@@ -23,17 +23,17 @@ from pages import forgotPass
 
 PORT = 8000
 
-# Inicializa o FastAPI
+
 app = FastAPI(title="CodePath API", description="API para o aplicativo CodePath.")
 
-# --- 2. Defina as origens (sites) que podem acessar sua API ---
+
 origins = [
     "http://localhost:5173",  # Seu React em desenvolvimento
     "https://projeto-codepath.onrender.com", # O próprio backend
-    # "https://SEU-FRONTEND-NO-VERCEL-OU-NETLIFY.com" # Adicione seu site de produção aqui
+    
 ]
 
-# --- 3. Adicione o Middleware de CORS ao 'app' ---
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,       # Lista de origens permitidas
@@ -43,13 +43,7 @@ app.add_middleware(
 )
 
 
-# (Seu código de inicialização do Firebase)
-# # try:
-# # ...
-# # except ...
 
-
-# --- Endpoints da API ---
 
 @app.get("/")
 def root():
