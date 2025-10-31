@@ -15,7 +15,15 @@ class UpdateUserLevel(BaseModel):
 class ApiResponse(BaseModel):
     success: bool
     message: str
+
+class GlobalLevelSetRequest(BaseModel):
+    email: str
+    globalLevel: str # "iniciante", "intermediario", ou "avancado"
     
+class ApiResponseProfileUpdate(BaseModel): # Você já deve ter este
+    success: bool
+    message: str
+    user: dict | None = None
 
 
 @router.post("/update_nivel", response_model=ApiResponse)
@@ -44,3 +52,41 @@ async def update_user_level(data: UpdateUserLevel):
     except Exception as e:
         print(f"Erro ao atualizar o nível do usuário: {e}")
         raise HTTPException(status_code=500, detail="Ocorreu um erro interno no servidor.")
+
+
+
+@router.post("/profile/set-global-level", response_model=ApiResponseProfileUpdate)
+async def set_global_level(request: GlobalLevelSetRequest):
+    """
+    Define o nível de dificuldade global (nivel) de um usuário 
+    após o teste de nivelamento.
+    """
+    try:
+        user_ref = db.collection("usuarios").where(
+            filter=FieldFilter("email", "==", request.email)
+        ).limit(1)
+        user_docs = user_ref.get()
+        user_doc = next(user_docs, None)
+
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+        user_id = user_doc.id
+        user_data = user_doc.to_dict()
+
+        # Atualiza o campo 'nivel' na raiz do documento do usuário
+        db.collection("usuarios").document(user_id).update({
+            "nivel": request.globalLevel
+        })
+        
+        # Retorna o 'user' atualizado para o frontend
+        user_data["nivel"] = request.globalLevel 
+        return ApiResponseProfileUpdate(
+            success=True, 
+            message="Nível global atualizado com sucesso!",
+            user=user_data
+        )
+
+    except Exception as e:
+        print(f"❌ Erro ao definir nível global: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
