@@ -1,40 +1,32 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Body
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+# -----------------------------------------------------------------
+# REMOVIDO: fastapi_mail e ConnectionConfig
+# ADICIONADO: sib_api_v3_sdk (Brevo)
+# -----------------------------------------------------------------
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
+# -----------------------------------------------------------------
 from firebase_config import db # Sua configuração do Firestore
 import datetime
 import secrets # Para gerar tokens seguros
 import os
 from dotenv import load_dotenv
-import bcrypt # 🚀 IMPORTANTE: Para o hash da nova senha
-from pydantic import BaseModel, EmailStr, SecretStr
+import bcrypt # Para o hash da nova senha
+from pydantic import BaseModel, EmailStr
 
 # Carrega variáveis do arquivo .env
 load_dotenv()
 
 router = APIRouter()
 
+# -----------------------------------------------------------------
+# REMOVIDO: ConnectionConfig e fm = FastMail(conf)
+# -----------------------------------------------------------------
 
-conf = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
-    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
-    MAIL_FROM=os.getenv("MAIL_FROM"),
-    MAIL_PORT=int(os.getenv("MAIL_PORT", 587)),
-    MAIL_SERVER=os.getenv("MAIL_SERVER"),
-    MAIL_FROM_NAME=os.getenv("MAIL_FROM_NAME"),
-    MAIL_STARTTLS=os.getenv("MAIL_STARTTLS", 'True').lower() == 'true',
-    MAIL_SSL_TLS=os.getenv("MAIL_SSL_TLS", 'False').lower() == 'true',
-    USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True,
-    TEMPLATE_FOLDER=None
-)
-fm = FastMail(conf)
-
-
-# --- Modelos Pydantic ---
+# --- Modelos Pydantic (Sem alterações) ---
 class PasswordResetRequest(BaseModel):
     email: EmailStr
 
-# 🚀 NOVO: Modelo para o Passo 2
 class ResetPasswordPayload(BaseModel):
     email: EmailStr
     token: str
@@ -44,22 +36,70 @@ class ApiResponse(BaseModel):
     success: bool
     message: str
 
-# 🚀 FUNÇÃO DE HASH (Pegue do seu endpoint de registro)
 def hash_password(password: str) -> str:
-    """Gera o hash de uma senha."""
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
     return hashed.decode('utf-8')
 
 
-# --- Endpoint PASSO 1: Solicitar Redefinição ---
+# --- (NOVA) Função de Envio de Email com Brevo ---
+# Esta função será chamada na Background Task
+# Ela é SINCRONA, o que é perfeito para a background task
+# -----------------------------------------------------------------
+def send_reset_email_brevo(user_email: str, token: str, email_body: str):
+    """
+    Envia o email de redefinição de senha usando a API do Brevo.
+    """
+    print(f"Iniciando envio de email para {user_email} via Brevo...")
+
+    # 1. Configurar a API do Brevo
+    # A chave é lida da variável de ambiente (que você configurou na Render)
+    config = sib_api_v3_sdk.Configuration()
+    config.api_key['api-key'] = os.getenv("BREVO_API_KEY")
+
+    if not config.api_key['api-key']:
+        print("❌ ERRO CRÍTICO: BREVO_API_KEY não foi encontrada nas variáveis de ambiente.")
+        return # Falha silenciosamente para não quebrar a task
+
+    # 2. Criar a instância da API
+    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(config))
+
+    # 3. Montar o email
+    subject = f"Código de Redefinição de Senha - {os.getenv('MAIL_FROM_NAME', 'CodePath')}"
+    sender_name = os.getenv("MAIL_FROM_NAME", "CodePath")
+    sender_email = os.getenv("MAIL_FROM") # O email que você verificou no Brevo
+
+    if not sender_email:
+        print("❌ ERRO CRÍTICO: MAIL_FROM não foi encontrado.")
+        return
+
+    # Monta o objeto de envio
+    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+        to=[{"email": user_email}],
+        sender={"name": sender_name, "email": sender_email},
+        subject=subject,
+        html_content=email_body # A sua variável de body HTML funciona perfeitamente
+    )
+
+    # 4. Enviar o email
+    try:
+        api_response = api_instance.send_transac_email(send_smtp_email)
+        print(f"Email enviado com sucesso para {user_email}. Message ID: {api_response.message_id}")
+    except ApiException as e:
+        # Este print aparecerá nos logs da Render se algo der errado
+        print(f"❌ Erro ao enviar email pelo Brevo: {e}")
+    except Exception as e:
+        print(f"❌ Erro inesperado no envio Brevo: {e}")
+
+
+# --- Endpoint PASSO 1: Solicitar Redefinição (Modificado) ---
 @router.post("/request-password-reset", response_model=ApiResponse)
 async def request_password_reset(
     request: PasswordResetRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks # A mágica continua aqui
 ):
     """
-    Verifica o email, gera um token e envia por email.
+    Verifica o email, gera um token e envia por email (AGORA COM BREVO).
     """
     user_email = request.email
     
@@ -67,21 +107,20 @@ async def request_password_reset(
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco de dados.")
 
     try:
-        # 1. Verificar se o email existe
+        # 1. Verificar se o email existe (Sem alterações)
         users_ref = db.collection('usuarios')
         query = users_ref.where('email', '==', user_email).limit(1).stream()
         existing_users = list(query)
 
         if not existing_users:
-            # Por segurança, não informe o erro, apenas retorne a msg genérica.
             print(f"Tentativa de redefinição para email não cadastrado: {user_email}")
             return {"success": True, "message": "Se um usuário com este email existir, um código de redefinição foi enviado."}
 
-        # 2. Gerar token (mais curto e legível para digitação)
-        token = str(secrets.randbelow(900000) + 100000) # Gera um código de 6 dígitos
-        expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=15) # Expira em 15 minutos
+        # 2. Gerar token (Sem alterações)
+        token = str(secrets.randbelow(900000) + 100000)
+        expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
 
-        # 3. Armazenar token no Firestore
+        # 3. Armazenar token no Firestore (Sem alterações)
         token_ref = db.collection('password_reset_tokens').document()
         token_ref.set({
             'email': user_email,
@@ -91,7 +130,7 @@ async def request_password_reset(
             'used': False
         })
 
-        # 4. 🚀 CORREÇÃO: Enviar o CÓDIGO (token) no email, não um link
+        # 4. Preparar o corpo do email (Sem alterações)
         email_body = f"""
         <html>
         <body>
@@ -108,14 +147,17 @@ async def request_password_reset(
         </html>
         """
 
-        message = MessageSchema(
-            subject=f"Código de Redefinição de Senha - {os.getenv('MAIL_FROM_NAME', 'CodePath')}",
-            recipients=[user_email],
-            body=email_body,
-            subtype=MessageType.html
+        # -----------------------------------------------------------------
+        # MUDANÇA PRINCIPAL:
+        # Trocamos 'fm.send_message' pela nossa nova função 'send_reset_email_brevo'
+        # -----------------------------------------------------------------
+        background_tasks.add_task(
+            send_reset_email_brevo, 
+            user_email, 
+            token, 
+            email_body
         )
-
-        background_tasks.add_task(fm.send_message, message)
+        # -----------------------------------------------------------------
 
         return {"success": True, "message": "Se um usuário com este email existir, um código de redefinição foi enviado."}
 
@@ -124,7 +166,9 @@ async def request_password_reset(
         raise HTTPException(status_code=500, detail="Ocorreu um erro ao processar sua solicitação.")
 
 
-# --- 🚀 NOVO Endpoint PASSO 2: Definir a Nova Senha ---
+# --- Endpoint PASSO 2: Definir a Nova Senha (Sem alterações) ---
+# Este endpoint não envia email, então não precisa de NENHUMA alteração.
+# -----------------------------------------------------------------
 @router.post("/reset-password", response_model=ApiResponse)
 async def reset_password(payload: ResetPasswordPayload = Body(...)):
     """
@@ -138,7 +182,7 @@ async def reset_password(payload: ResetPasswordPayload = Body(...)):
                           .where('used', '==', False)\
                           .limit(1).stream()
         
-        token_doc = next(query, None) # Pega o primeiro resultado ou None
+        token_doc = next(query, None) 
 
         if not token_doc:
             raise HTTPException(status_code=400, detail="Código inválido ou não encontrado.")
@@ -147,9 +191,8 @@ async def reset_password(payload: ResetPasswordPayload = Body(...)):
         token_data = token_doc.to_dict()
         expires_at = token_data['expires_at']
         
-        # Converte para 'aware' datetime (se não estiver)
         if expires_at.tzinfo is None:
-             expires_at = expires_at.replace(tzinfo=datetime.timezone.utc)
+                 expires_at = expires_at.replace(tzinfo=datetime.timezone.utc)
 
         if datetime.datetime.now(datetime.timezone.utc) > expires_at:
             raise HTTPException(status_code=400, detail="Código expirado. Solicite um novo.")
@@ -167,16 +210,16 @@ async def reset_password(payload: ResetPasswordPayload = Body(...)):
 
         # 5. Atualizar a senha do usuário no Firestore
         user_doc.reference.update({
-            'senha_hash': new_password_hash # ⚠️ Certifique-se que o nome do campo é 'senha_hash'
+            'senha_hash': new_password_hash 
         })
 
+        # 6. Invalidar o token (agora deletando)
         token_doc.reference.delete()
         print(f"Token {payload.token} para {payload.email} excluído com sucesso.") # Log opcional
 
         return {"success": True, "message": "Senha redefinida com sucesso!"}
 
     except HTTPException as http_exc:
-        # Repassa exceções HTTP
         raise http_exc
     except Exception as e:
         print(f"❌ Erro ao redefinir senha: {e}")
