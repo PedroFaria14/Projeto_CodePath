@@ -1,3 +1,5 @@
+// Arquivo: PaginaHome.dart
+
 // ⚠️ CORREÇÃO: Sintaxe correta dos imports de pacotes.
 
 import 'dart:convert';
@@ -518,6 +520,63 @@ class _PaginaHomeState extends State<PaginaHome> {
     }
   }
 
+  // 👇 NOVA FUNÇÃO PARA O BOTÃO DE BATALHA 👇
+  Future<void> _iniciarBatalha() async {
+    // 1. Descobrir contra quem o usuário quer jogar
+    //    (Por enquanto, vamos simular que ele desafiou "oponente@email.com")
+    //    No futuro, aqui você abriria um modal para o usuário digitar o email de um amigo.
+
+    // 2. Pegar o email do jogador atual
+    final prefs = await SharedPreferences.getInstance();
+    final emailJogador = prefs.getString("userEmail");
+    final nivelJogador = prefs.getString("userNivel") ?? "iniciante";
+
+    if (emailJogador == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Você precisa estar logado para batalhar!"),
+        ),
+      );
+      return;
+    }
+
+    // AQUI VEM A LÓGICA DE CRIAR A PARTIDA NO BACKEND
+    // (Vamos deixar isso comentado por enquanto,
+    //  pois primeiro precisamos criar a tela de batalha)
+
+    print("TODO: Abrir a nova tela de batalha (desafio_page.dart)");
+
+    /* // FLUXO FUTURO:
+    
+    // 1. Chamar o backend para criar o desafio
+    final response = await http.post(
+      Uri.parse("https://projeto-codepath.onrender.com/desafio/criar"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "email_desafiante": emailJogador,
+        "email_desafiado": "amigo@email.com", // Email do oponente
+        "nivel": nivelJogador
+      })
+    );
+    
+    // 2. Se deu certo, pegar os dados do desafio (ID, Pergunta, Opções)
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final idDesafio = data["id_desafio"];
+      
+      // 3. Navegar para a NOVA tela de batalha
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => DesafioPage( // A nova tela que vamos criar
+           idDesafio: idDesafio,
+           // Passar os dados da pergunta que o backend enviou
+        )
+      ));
+    }
+    */
+  }
+  // 👆 FIM DA NOVA FUNÇÃO 👆
+
   void _onItemTapped(int index) async {
     setState(() => _selectedIndex = index);
 
@@ -950,6 +1009,81 @@ class _PaginaHomeState extends State<PaginaHome> {
                           ),
                         ),
                       ),
+
+                      // 👇 NOVO BOTÃO DE BATALHA ADICIONADO AQUI 👇
+                      const SizedBox(height: 12), // Espaçamento
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                        child: InkWell(
+                          // InkWell para efeito de clique
+                          onTap: _iniciarBatalha, // Nova função
+                          borderRadius: BorderRadius.circular(15),
+                          child: Container(
+                            height: 80,
+                            padding: const EdgeInsets.all(16.0),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFFD32F2F), // Vermelho Batalha
+                                  Color(0xFFB71C1C), // Vermelho Escuro
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(15),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 5,
+                                  offset: Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons
+                                      .bolt_rounded, // Ícone de "raio" ou "batalha"
+                                  color: Colors.white,
+                                  size: 32,
+                                ),
+                                const SizedBox(width: 15),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      Text(
+                                        "Batalha x1 Rápida",
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      Text(
+                                        "Desafie outro jogador!",
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Seta para indicar ação
+                                const Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: Colors.white70,
+                                  size: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // 👆 FIM DO NOVO BOTÃO DE BATALHA 👆
 
                       // Adiciona um espaço no final da lista
                       const SizedBox(height: 20),
