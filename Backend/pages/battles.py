@@ -29,7 +29,7 @@ class BatalhaInitResponse(BaseModel):
     tipo_batalha: str # "NOVA_BATALHA" ou "DESAFIO_EXISTENTE"
     perguntas: List[Dict[str, Any]] # As 10 perguntas para o jogador
     id_batalha_oponente: Optional[str] = None # O ID do jogo pendente (se houver)
-    pontuacao_oponente: Optional[int] = None # O placar a ser batido (se houver)
+    pontuacao_oponente: Optional[int] = None
 
 
 # --- Funções Auxiliares ---
