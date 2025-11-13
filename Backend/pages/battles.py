@@ -2,45 +2,40 @@ from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
 import datetime
 from firebase_config import db
+from google.cloud.firestore_v1 import Increment # Import para moedas
 from google.cloud.firestore_v1.base_query import FieldFilter
 import random
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 router = APIRouter()
 
-# --- Modelos Pydantic (Validação de Dados) ---
+# --- Modelos Pydantic ---
 
-class DesafioCreateRequest(BaseModel):
-    """ O que o app envia para criar um desafio """
-    email_desafiante: str
-    email_desafiado: str
-    nivel: str # "iniciante", "intermediario", ou "avancado"
+class BatalhaInitRequest(BaseModel):
+    """ O que o app envia para COMEÇAR a busca por uma batalha """
+    email: str
+    nivel: str # "iniciante", "intermediario", "avancado"
 
-class DesafioSubmitRequest(BaseModel):
-    """ O que o app envia para responder a pergunta """
-    id_desafio: str
-    email_jogador: str
-    resposta: str # A alternativa que o jogador selecionou
+class BatalhaFinalizarRequest(BaseModel):
+    """ O que o app envia DEPOIS de responder as 10 perguntas """
+    email: str
+    pontuacao: int # Número de acertos (Ex: 7)
+    tempo_gasto_segundos: float # Ex: 120.5
+    id_batalha_oponente: Optional[str] = None # Se ele estava desafiando um placar pendente
+    pontuacao_oponente: Optional[int] = None # O placar que ele precisava bater
 
-class DesafioSubmitResponse(BaseModel):
-    """ O que o servidor responde após uma submissão """
-    success: bool # A resposta estava correta?
-    message: str # "Você Venceu!", "Resposta Incorreta", "Tarde demais!"
-    status_jogo: str # "VENCEU", "PERDEU_ATRASADO", "TENTE_NOVAMENTE"
+class BatalhaInitResponse(BaseModel):
+    """ O que o backend retorna para o app """
+    tipo_batalha: str # "NOVA_BATALHA" ou "DESAFIO_EXISTENTE"
+    perguntas: List[Dict[str, Any]] # As 10 perguntas para o jogador
+    id_batalha_oponente: Optional[str] = None # O ID do jogo pendente (se houver)
+    pontuacao_oponente: Optional[int] = None # O placar a ser batido (se houver)
 
-class DesafioResponse(BaseModel):
-    """ O que o servidor responde ao criar o desafio """
-    success: bool
-    message: str
-    desafio: Dict[str, Any] | None = None # Envia o desafio inteiro
 
 # --- Funções Auxiliares ---
 
-async def get_pergunta_aleatoria(nivel: str) -> Dict[str, Any]:
-    """ 
-    Busca uma ÚNICA pergunta aleatória do nível especificado.
-    (Baseado na sua lógica de 'leasson.py')
-    """
+async def get_perguntas_aleatorias(nivel: str, count: int = 10) -> List[Dict[str, Any]]:
+    """ Busca 10 perguntas aleatórias do nível (com validação) """
     mapa_niveis = {
         "iniciante": "Facil",
         "intermediario": "Medio",
@@ -52,211 +47,195 @@ async def get_pergunta_aleatoria(nivel: str) -> Dict[str, Any]:
         filter=FieldFilter("nivel", "==", nivel_convertido)
     ).stream()
     
-    lista_perguntas = []
-    for doc in perguntas_ref:
-        pergunta = doc.to_dict()
-        pergunta["doc_id"] = doc.id # Guardamos o ID do doc original
-        lista_perguntas.append(pergunta)
+    lista_perguntas = [doc.to_dict() for doc in perguntas_ref]
     
     if not lista_perguntas:
         raise HTTPException(status_code=404, detail=f"Nenhuma pergunta encontrada para o nível {nivel}")
-        
-    pergunta_escolhida = random.choice(lista_perguntas)
-    return pergunta_escolhida
-
-# --- Endpoints do Desafio x1 ---
-
-@router.post("/desafio/criar", response_model=DesafioResponse, tags=["Desafio x1"])
-async def criar_desafio(payload: DesafioCreateRequest):
-    """
-    PASSO 1: O Jogador A (desafiante) convida o Jogador B (desafiado).
-    O backend seleciona a pergunta e cria a partida.
-    """
-    try:
-        # 1. Pega uma pergunta aleatória
-        pergunta = await get_pergunta_aleatoria(payload.nivel)
-
-        # 2. Cria o documento do desafio no Firestore
-        # Coleção: 'desafios_x1'
-        desafio_ref = db.collection("desafios_x1").document()
-        
-        # O objeto que será salvo no Firestore
-        novo_desafio = {
-            "id_pergunta": pergunta.get("idPergunta"),
-            "pergunta_texto": pergunta.get("pergunta"),
-            "opcoes": pergunta.get("opcoes"),
-            "resposta_correta": pergunta.get("resposta_correta"), # CRÍTICO
-            
-            "desafiante_email": payload.email_desafiante,
-            "desafiado_email": payload.email_desafiado,
-            
-            "status": "pendente", # pendente -> iniciado -> concluido
-            "timestamp_criacao": datetime.datetime.utcnow(),
-            
-            "timestamp_inicio_desafiante": None,
-            "timestamp_inicio_desafiado": None,
-            
-            "vencedor": None,
-            "tempo_vencedor_segundos": None
-        }
-        
-        # 3. Salva no banco
-        desafio_ref.set(novo_desafio)
-
-        # 4. Adiciona o ID do documento ao objeto antes de retornar
-        novo_desafio["id_desafio"] = desafio_ref.id 
-
-        # 5. Retorna o desafio completo para o app
-        return DesafioResponse(
-            success=True, 
-            message="Desafio criado! Aguardando oponente.", 
-            desafio=novo_desafio
-        )
-
-    except Exception as e:
-        print(f"❌ Erro ao criar desafio: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/desafio/iniciar/{id_desafio}/{email_jogador}", tags=["Desafio x1"])
-async def iniciar_desafio(id_desafio: str, email_jogador: str):
-    """
-    PASSO 2: O jogador (A ou B) ABRE a tela de batalha.
-    O servidor registra o "timestamp_inicio" dele. Isso é o 'START' do cronômetro.
-    """
-    try:
-        desafio_ref = db.collection("desafios_x1").document(id_desafio)
-        desafio = desafio_ref.get()
-
-        if not desafio.exists:
-            raise HTTPException(status_code=404, detail="Desafio não encontrado")
-
-        desafio_data = desafio.to_dict()
-        
-        # Define qual campo de timestamp (desafiante ou desafiado) vamos atualizar
-        campo_timestamp = None
-        if email_jogador == desafio_data.get("desafiante_email"):
-            campo_timestamp = "timestamp_inicio_desafiante"
-        elif email_jogador == desafio_data.get("desafiado_email"):
-            campo_timestamp = "timestamp_inicio_desafiado"
-        else:
-            raise HTTPException(status_code=403, detail="Você não faz parte deste desafio")
-
-        # Segurança: Só registra o início UMA VEZ
-        if desafio_data.get(campo_timestamp) is None:
-            desafio_ref.update({
-                campo_timestamp: datetime.datetime.utcnow(),
-                "status": "iniciado" # O primeiro a iniciar muda o status
-            })
-
-        return {"success": True, "message": "Cronômetro do servidor iniciado!"}
-
-    except Exception as e:
-        print(f"❌ Erro ao iniciar desafio: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/desafio/submeter", response_model=DesafioSubmitResponse, tags=["Desafio x1"])
-async def submeter_resposta_desafio(payload: DesafioSubmitRequest):
-    """
-    PASSO 3: O jogador envia a resposta. Esta é a lógica de "quem responder primeiro ganha".
-    O servidor é o juiz.
-    """
-    try:
-        desafio_ref = db.collection("desafios_x1").document(payload.id_desafio)
-        desafio_doc = desafio_ref.get()
-
-        if not desafio_doc.exists:
-            raise HTTPException(status_code=404, detail="Desafio não encontrado")
-
-        desafio_data = desafio_doc.to_dict()
-
-        # 1. VERIFICAÇÃO DE JOGO: O JOGO JÁ ACABOU?
-        if desafio_data.get("status") == "concluido":
-            # Se já acabou, avisa que ele perdeu por tempo
-            return DesafioSubmitResponse(
-                success=False, # Mesmo que a resposta esteja certa, ele foi lento
-                message=f"Tarde demais! {desafio_data.get('vencedor')} respondeu primeiro.",
-                status_jogo="PERDEU_ATRASADO"
-            )
-
-        # 2. VERIFICAÇÃO DA RESPOSTA: A RESPOSTA ESTÁ CORRETA?
-        resposta_correta_servidor = desafio_data.get("resposta_correta")
-        
-        if payload.resposta != resposta_correta_servidor:
-            # Resposta errada. O jogo continua.
-            return DesafioSubmitResponse(
-                success=False, 
-                message="Resposta incorreta! Tente novamente.",
-                status_jogo="TENTE_NOVAMENTE"
-            )
-
-        # 3. VERIFICAÇÃO DE VITÓRIA: A RESPOSTA ESTÁ CORRETA!
-        # Agora, calculamos o tempo e declaramos a vitória.
-        
-        # Pega o timestamp de início correto (desafiante ou desafiado)
-        campo_timestamp_inicio = None
-        if payload.email_jogador == desafio_data.get("desafiante_email"):
-            campo_timestamp_inicio = "timestamp_inicio_desafiante"
-        elif payload.email_jogador == desafio_data.get("desafiado_email"):
-            campo_timestamp_inicio = "timestamp_inicio_desafiado"
-        else:
-            raise HTTPException(status_code=403, detail="Você não faz parte deste desafio")
-
-        timestamp_inicio = desafio_data.get(campo_timestamp_inicio)
-        
-        # Fallback: Se o jogador não chamou /iniciar (improvável), usa o tempo de criação
-        if timestamp_inicio is None:
-            timestamp_inicio = desafio_data.get("timestamp_criacao") 
-
-        # CALCULA O TEMPO DE RESPOSTA
-        timestamp_agora = datetime.datetime.utcnow()
-        tempo_gasto = (timestamp_agora - timestamp_inicio).total_seconds()
-
-        # 4. ATUALIZA O DESAFIO: DECLARA O VENCEDOR
-        # Este 'update' é atômico. O primeiro a chegar aqui ganha.
-        desafio_ref.update({
-            "status": "concluido",
-            "vencedor": payload.email_jogador,
-            "tempo_vencedor_segundos": round(tempo_gasto, 2)
-        })
-
-        # Retorna a mensagem de vitória
-        return DesafioSubmitResponse(
-            success=True, 
-            message=f"Parabéns, você venceu! Tempo: {round(tempo_gasto, 2)}s",
-            status_jogo="VENCEU"
-        )
-
-    except Exception as e:
-        print(f"❌ Erro ao submeter desafio: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/desafios/pendentes/{email_jogador}", tags=["Desafio x1"])
-async def get_desafios_pendentes(email_jogador: str):
-    """
-    (BÔNUS) Endpoint para o Jogador B ver quais convites ele recebeu.
-    """
-    try:
-        desafios_ref = db.collection("desafios_x1")
-        
-        query = desafios_ref.where(
-            filter=FieldFilter("desafiado_email", "==", email_jogador)
-        ).where(
-            filter=FieldFilter("status", "==", "pendente")
-        ).limit(20) # Limita a 20 convites
-        
-        docs = query.stream()
-        
-        lista_desafios = []
-        for doc in docs:
-            desafio_data = doc.to_dict()
-            desafio_data["id_desafio"] = doc.id # Adiciona o ID do documento
-            lista_desafios.append(desafio_data)
-
-        return {"success": True, "desafios": lista_desafios}
     
+    # Garante que não tentamos pegar mais perguntas do que existem
+    num_a_pegar = min(count, len(lista_perguntas))
+    if num_a_pegar < count:
+        print(f"Aviso: Pedido {count} perguntas, mas só existem {num_a_pegar} no nível {nivel_convertido}")
+
+    perguntas_escolhidas = random.sample(lista_perguntas, num_a_pegar)
+    return perguntas_escolhidas
+
+async def get_rank_score(email: str) -> int:
+    """ Pega o 'rank_score' do usuário (já deve existir do login/register) """
+    user_ref_query = db.collection("usuarios").where(filter=FieldFilter("email", "==", email)).limit(1).get()
+    if not user_ref_query:
+        return 1000 
+
+    user_doc = user_ref_query[0]
+    user_data = user_doc.to_dict()
+    
+    # O login/register já deve ter criado isso, mas garantimos.
+    return user_data.get("rank_score", 1000)
+
+async def atualizar_rank(email: str, vitoria: bool):
+    """ Atualiza o rank do usuário (lógica simples de +10 / -10) """
+    user_ref_query = db.collection("usuarios").where(filter=FieldFilter("email", "==", email)).limit(1).get()
+    if not user_ref_query:
+        return
+
+    user_doc = user_ref_query[0]
+    user_data = user_doc.to_dict()
+    
+    score_atual = user_data.get("rank_score", 1000)
+    
+    if vitoria:
+        score_novo = score_atual + 10 # Ganha 10 pontos
+    else:
+        score_novo = max(score_atual - 10, 0) # Perde 10 (mínimo 0)
+        
+    user_doc.reference.update({"rank_score": score_novo})
+
+async def atualizar_moedas(email: str, quantidade: int):
+    """ Adiciona (ou remove) moedas de um usuário """
+    user_ref_query = db.collection("usuarios").where(filter=FieldFilter("email", "==", email)).limit(1).get()
+    if not user_ref_query:
+        return # Usuário não encontrado
+
+    user_doc = user_ref_query[0]
+    
+    # Usa Increment() para adicionar 'quantidade' ao valor existente de forma segura
+    user_doc.reference.update({
+        "moedas": Increment(quantidade)
+    })
+
+
+# --- Endpoints da Batalha Ranqueada ---
+
+@router.post("/batalha/iniciar", response_model=BatalhaInitResponse, tags=["Batalha Ranqueada"])
+async def iniciar_batalha(payload: BatalhaInitRequest):
+    """
+    PASSO 1: Jogador aperta "Batalha".
+    O backend procura um oponente na fila OU cria um novo jogo.
+    """
+    try:
+        rank_jogador_atual = await get_rank_score(payload.email)
+        
+        # Lógica de Matchmaking: Busca oponente com rank próximo (+/- 100)
+        rank_min = rank_jogador_atual - 100
+        rank_max = rank_jogador_atual + 100
+        
+        fila_ref_query = db.collection("batalha_queue").where(
+            filter=FieldFilter("status", "==", "aguardando_oponente")
+        ).where(
+            filter=FieldFilter("rank_score_jogador", ">=", rank_min)
+        ).where(
+            filter=FieldFilter("rank_score_jogador", "<=", rank_max)
+        ).limit(1)
+        
+        fila_docs = list(fila_ref_query.stream()) # Executa a query
+
+        perguntas_para_jogador = await get_perguntas_aleatorias(payload.nivel, 10)
+
+        # CASO 1: ENCONTROU UM OPONENTE NA FILA
+        if fila_docs:
+            oponente_doc = fila_docs[0]
+            oponente_data = oponente_doc.to_dict()
+            
+            if oponente_data.get("email_jogador") == payload.email:
+                 pass # É o seu próprio jogo pendente, ignora (Cai no CASO 2)
+            else:
+                # É um desafio válido!
+                return BatalhaInitResponse(
+                    tipo_batalha="DESAFIO_EXISTENTE",
+                    perguntas=perguntas_para_jogador,
+                    id_batalha_oponente=oponente_doc.id,
+                    pontuacao_oponente=oponente_data.get("pontuacao")
+                )
+
+        # CASO 2: NÃO ACHOU OPONENTE
+        return BatalhaInitResponse(
+            tipo_batalha="NOVA_BATALHA",
+            perguntas=perguntas_para_jogador,
+            id_batalha_oponente=None,
+            pontuacao_oponente=None
+        )
+
     except Exception as e:
-        print(f"❌ Erro ao buscar desafios pendentes: {e}")
+        print(f"❌ Erro ao iniciar batalha: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/batalha/finalizar", tags=["Batalha Ranqueada"])
+async def finalizar_batalha(payload: BatalhaFinalizarRequest):
+    """
+    PASSO 2: Jogador terminou suas 10 perguntas.
+    Ele envia o placar. O backend decide o resultado.
+    """
+    try:
+        rank_jogador_atual = await get_rank_score(payload.email)
+        
+        # CASO 1: Ele estava jogando um "NOVA_BATALHA"
+        if payload.id_batalha_oponente is None:
+            db.collection("batalha_queue").add({
+                "email_jogador": payload.email,
+                "rank_score_jogador": rank_jogador_atual,
+                "pontuacao": payload.pontuacao,
+                "tempo_gasto_segundos": payload.tempo_gasto_segundos,
+                "timestamp_criacao": datetime.datetime.utcnow(),
+                "status": "aguardando_oponente"
+            })
+            
+            return {
+                "status_final": "AGUARDANDO_OPONENTE",
+                "message": "Placar salvo! Assim que um oponente jogar, avisaremos o resultado."
+            }
+
+        # CASO 2: Ele estava jogando um "DESAFIO_EXISTENTE"
+        pontuacao_oponente = payload.pontuacao_oponente 
+        
+        # VITORIA
+        if payload.pontuacao > pontuacao_oponente:
+            await atualizar_rank(payload.email, vitoria=True) 
+            await atualizar_moedas(payload.email, 50) # Dá 50 moedas 🪙
+            
+            oponente_ref = db.collection("batalha_queue").document(payload.id_batalha_oponente).get()
+            if oponente_ref.exists:
+                email_oponente = oponente_ref.to_dict().get("email_jogador")
+                await atualizar_rank(email_oponente, vitoria=False)
+            
+            db.collection("batalha_queue").document(payload.id_batalha_oponente).delete()
+            
+            return {
+                "status_final": "VITORIA",
+                "message": f"Você Venceu! ({payload.pontuacao} a {pontuacao_oponente})",
+                "placar_seu": payload.pontuacao,
+                "placar_oponente": pontuacao_oponente
+            }
+        
+        # DERROTA
+        elif payload.pontuacao < pontuacao_oponente:
+            await atualizar_rank(payload.email, vitoria=False) 
+            
+            oponente_ref = db.collection("batalha_queue").document(payload.id_batalha_oponente).get()
+            if oponente_ref.exists:
+                email_oponente = oponente_ref.to_dict().get("email_jogador")
+                await atualizar_rank(email_oponente, vitoria=True)
+
+            db.collection("batalha_queue").document(payload.id_batalha_oponente).delete()
+            
+            return {
+                "status_final": "DERROTA",
+                "message": f"Você Perdeu. ({payload.pontuacao} a {pontuacao_oponente})",
+                "placar_seu": payload.pontuacao,
+                "placar_oponente": pontuacao_oponente
+            }
+        
+        # EMPATE
+        else:
+            db.collection("batalha_queue").document(payload.id_batalha_oponente).delete()
+            
+            return {
+                "status_final": "EMPATE",
+                "message": f"Empate! ({payload.pontuacao} a {pontuacao_oponente})",
+                "placar_seu": payload.pontuacao,
+                "placar_oponente": pontuacao_oponente
+            }
+
+    except Exception as e:
+        print(f"❌ Erro ao finalizar batalha: {e}")
         raise HTTPException(status_code=500, detail=str(e))

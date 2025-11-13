@@ -96,6 +96,14 @@ async def login_user(user: UserLogin):
             user_doc.reference.update({'fases': INITIAL_FASES})
             user_data['fases'] = INITIAL_FASES
 
+        if 'rank_score' not in user_data:
+            user_doc.reference.update({'rank_score': 1000})
+            user_data['rank_score'] = 1000
+            
+        if 'moedas' not in user_data:
+            user_doc.reference.update({'moedas': 0})
+            user_data['moedas'] = 0
+            
         # Atualiza Firestore
         user_doc.reference.update({
             'streak': streak,

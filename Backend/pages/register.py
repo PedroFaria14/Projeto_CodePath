@@ -72,7 +72,6 @@ async def register_user(user: UserRegister):
             user.data_nascimento, datetime.datetime.min.time()
         )
         
-        # 3. GERAR O HASH DA SENHA
         hashed_password = hash_password(user.senha)
 
         user_data = {
@@ -80,13 +79,14 @@ async def register_user(user: UserRegister):
             "data_nascimento": data_nasc_datetime,
             "telefone": telefone_limpo,
             "email": user.email,
-            # 4. SALVAR O HASH, NÃO A SENHA PURA
             "senha_hash": hashed_password, 
-            # "senha": user.senha, # <- LINHA ANTIGA REMOVIDA
             "streak": 1,
             "last_login": datetime.datetime.utcnow(),
             "nivel": "iniciante",
-            "fases": INITIAL_FASES, # Use o formato de mapa aninhado
+            "fases": INITIAL_FASES,
+            
+            "moedas": 0,
+            "rank_score": 1000  
         }
 
         users_ref.add(user_data)
