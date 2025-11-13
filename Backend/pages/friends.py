@@ -1,3 +1,4 @@
+import random
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel, EmailStr
 import datetime
@@ -274,3 +275,36 @@ async def remover_amigo(payload: RemoverAmigoRequest):
     except Exception as e:
         print(f"❌ Erro ao remover amigo: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+    
+@router.get("/amigos/sugestoes/{email_jogador}", tags=["Amigos"])
+async def get_sugestoes_amigos(email_jogador: str):
+ 
+    try:
+        users_ref = db.collection("usuarios")
+        
+        # Pega todos os usuários (exceto o atual)
+        query = users_ref.where(
+            filter=FieldFilter("email", "!=", email_jogador)
+        ).limit(20) # Pega os 20 primeiros
+        
+        docs = query.stream()
+        lista_usuarios = []
+        for doc in docs:
+            user_data = doc.to_dict()
+            lista_usuarios.append(
+                UsuarioEncontrado(
+                    nome=user_data.get("nome", "Usuário"),
+                    email=user_data.get("email")
+                )
+            )
+
+        # Embaralha a lista e pega 5
+        random.shuffle(lista_usuarios)
+        sugestoes = lista_usuarios[:5] 
+        
+        return {"success": True, "sugestoes": sugestoes}
+
+    except Exception as e:
+        print(f"❌ Erro ao buscar sugestões: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao buscar sugestões.")
