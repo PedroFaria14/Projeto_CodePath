@@ -1,5 +1,5 @@
 # Arquivo: pages/convite.py
-# (CORRIGIDO: O KeyError 'vencedor' foi arrumado)
+# (CORRIGIDO: Agora retorna o status de VITORIA/DERROTA/EMPATE)
 
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
@@ -10,12 +10,11 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 import random
 from typing import List, Dict, Any, Optional
 
-
+# Tenta importar a função ATUALIZADA de 'batalha.py'
 try:
     from pages.battles import get_perguntas_aleatorias
 except ImportError:
     print("WARNING: Falha ao importar 'get_perguntas_aleatorias' de batalha.py. Usando fallback.")
-    
     async def get_perguntas_aleatorias(nivel: str, count: int = 10) -> List[Dict[str, Any]]:
         mapa_niveis = {
             "iniciante": ["Facil"],
@@ -35,11 +34,13 @@ except ImportError:
         perguntas_escolhidas = random.sample(lista_perguntas, num_a_pegar)
         return perguntas_escolhidas
 
-
 router = APIRouter()
 
+# --- CONSTANTES DE RECOMPENSA ---
 MOEDAS_VITORIA_CONVITE = 25
 MOEDAS_DERROTA_EMPATE_CONVITE = 5 
+# Batalhas de convite NÃO afetam o RANK.
+RANK_CHANGE_CONVITE = 0 
 
 # --- (Modelos Pydantic - Sem alterações) ---
 class ConviteCreateRequest(BaseModel):
@@ -160,35 +161,33 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
             moedas_jogador_atual = 0
             moedas_oponente = 0
             titulo_notificacao_oponente = ""
-            
-            # --- 👇 LÓGICA DO VENCEDOR CORRIGIDA 👇 ---
+            status_final_jogador_atual = "" # <-- NOVO
+
             if placar_A > placar_B:
                 email_vencedor = partida_data.get("email_desafiante")
-                update_data["vencedor"] = email_vencedor
             elif placar_B > placar_A:
                 email_vencedor = partida_data.get("email_desafiado")
-                update_data["vencedor"] = email_vencedor
-            else:
+            
+            # Define o status e as moedas para cada jogador
+            if placar_A == placar_B:
                 update_data["vencedor"] = "empate"
-            # --- FIM DA CORREÇÃO ---
-
-            # Define o título e as moedas para cada jogador
-            if update_data["vencedor"] == "empate":
                 titulo_notificacao_oponente = "Empate!"
+                status_final_jogador_atual = "EMPATE"
                 moedas_jogador_atual = MOEDAS_DERROTA_EMPATE_CONVITE
                 moedas_oponente = MOEDAS_DERROTA_EMPATE_CONVITE
             elif email_jogador_atual == email_vencedor:
-                # O jogador atual venceu
+                update_data["vencedor"] = email_jogador_atual
                 titulo_notificacao_oponente = "Você Perdeu!"
+                status_final_jogador_atual = "VITORIA"
                 moedas_jogador_atual = MOEDAS_VITORIA_CONVITE
                 moedas_oponente = MOEDAS_DERROTA_EMPATE_CONVITE
-            else:
-                # O jogador atual perdeu
+            else: # O oponente venceu
+                update_data["vencedor"] = email_oponente_offline
                 titulo_notificacao_oponente = "Você Venceu!"
+                status_final_jogador_atual = "DERROTA"
                 moedas_jogador_atual = MOEDAS_DERROTA_EMPATE_CONVITE
                 moedas_oponente = MOEDAS_VITORIA_CONVITE
             
-            # Atualiza as moedas de ambos
             await atualizar_moedas(email_jogador_atual, moedas_jogador_atual)
             await atualizar_moedas(email_oponente_offline, moedas_oponente)
 
@@ -197,7 +196,7 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
                 "email": email_oponente_offline,
                 "titulo": titulo_notificacao_oponente,
                 "mensagem": f"Sua batalha contra {email_jogador_atual} terminou! Placar: {placar_A} a {placar_B}.",
-                "rank_change": 0, # Convite não afeta rank
+                "rank_change": RANK_CHANGE_CONVITE,
                 "moedas_ganhas": moedas_oponente,
                 "lido": False,
                 "timestamp": datetime.datetime.utcnow()
@@ -206,10 +205,10 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
             convite_ref.update(update_data)
             
             return {
-                "status_final": "CONCLUIDO",
+                "status_final": status_final_jogador_atual, # <-- CORRIGIDO
                 "message": f"Batalha finalizada! Placar: {placar_A} a {placar_B}",
                 "vencedor": update_data["vencedor"],
-                "rank_change": 0, 
+                "rank_change": RANK_CHANGE_CONVITE, 
                 "moedas_ganhas": moedas_jogador_atual
             }
         
@@ -236,16 +235,15 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
 # --- (Endpoint /convite/pendentes - Sem alterações) ---
 @router.get("/convite/pendentes/{email_jogador}", tags=["Convite de Amigo"])
 async def get_convites_pendentes(email_jogador: str):
-    # ... (código idêntico)
     try:
         convites_ref = db.collection("batalhas_convite")
-        # --- CORREÇÃO DA LÓGICA PARA BUSCAR CONVITES ATIVOS ---
+        # Busca convites "pendente" (ninguém jogou) OU "desafiante_jogou" (esperando por você)
         status_validos = ["pendente", "desafiante_jogou"]
         
         query = convites_ref.where(
             filter=FieldFilter("email_desafiado", "==", email_jogador)
         ).where(
-            filter=FieldFilter("status", "in", status_validos) # <--- CORRIGIDO
+            filter=FieldFilter("status", "in", status_validos) 
         ).limit(20)
         
         docs_pendentes = query.stream()
