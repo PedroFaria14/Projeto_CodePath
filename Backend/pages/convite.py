@@ -1,5 +1,5 @@
 # Arquivo: pages/convite.py
-# (ATUALIZADO para usar a nova coleção "batalhas_perguntas")
+# (ATUALIZADO com recompensas na resposta)
 
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
@@ -11,13 +11,10 @@ import random
 from typing import List, Dict, Any, Optional
 
 # Tenta importar a função ATUALIZADA de 'batalha.py'
-# Se falhar, define uma cópia local ATUALIZADA da função.
 try:
     from pages.batalha import get_perguntas_aleatorias
 except ImportError:
     print("WARNING: Falha ao importar 'get_perguntas_aleatorias' de batalha.py. Usando fallback.")
-    
-    # 👇 FUNÇÃO AUXILIAR ATUALIZADA 👇
     async def get_perguntas_aleatorias(nivel: str, count: int = 10) -> List[Dict[str, Any]]:
         mapa_niveis = {
             "iniciante": ["Facil"],
@@ -25,45 +22,39 @@ except ImportError:
             "avancado": ["Dificil", "Muito Dificil", "SuperDificil"]
         }
         niveis_para_buscar = mapa_niveis.get(nivel.lower(), ["Facil"])
-
-        perguntas_ref = db.collection("batalhas_perguntas").where( # <-- Coleção Nova
+        perguntas_ref = db.collection("batalhas_perguntas").where(
             filter=FieldFilter("nivel", "in", niveis_para_buscar)
         ).stream()
-        
         lista_perguntas = [doc.to_dict() for doc in perguntas_ref]
-        
         if not lista_perguntas:
             raise HTTPException(status_code=404, detail=f"Nenhuma pergunta de batalha encontrada para o nível {nivel}")
-        
         num_a_pegar = min(count, len(lista_perguntas))
         if num_a_pegar < count:
             print(f"Aviso: Pedido {count} perguntas, mas só existem {num_a_pegar} nos níveis {niveis_para_buscar}")
-
         perguntas_escolhidas = random.sample(lista_perguntas, num_a_pegar)
         return perguntas_escolhidas
 
-
 router = APIRouter()
+
+# --- CONSTANTES DE RECOMPENSA ---
+MOEDAS_VITORIA_CONVITE = 25
 
 # --- (Modelos Pydantic - Sem alterações) ---
 class ConviteCreateRequest(BaseModel):
     email_desafiante: str
     email_desafiado: str
     nivel: str
-
 class ConviteFinalizarRequest(BaseModel):
     id_convite: str
     email_jogador: str
     pontuacao: int
     tempo_gasto_segundos: float
-
 class ConviteIniciarrResponse(BaseModel):
     perguntas: List[Dict[str, Any]]
     id_convite: str
 
 # --- (Função atualizar_moedas - Sem alterações) ---
 async def atualizar_moedas(email: str, quantidade: int):
-    # ... (código idêntico)
     user_ref_query = db.collection("usuarios").where(filter=FieldFilter("email", "==", email)).limit(1).get()
     if not user_ref_query:
         return
@@ -72,8 +63,7 @@ async def atualizar_moedas(email: str, quantidade: int):
         "moedas": Increment(quantidade)
     })
 
-# --- (Endpoints /convite/criar, /iniciar, /finalizar - Sem alterações na lógica, só usam a nova função de busca) ---
-
+# --- (Endpoints /convite/criar e /iniciar - Sem alterações) ---
 @router.post("/convite/criar", tags=["Convite de Amigo"])
 async def criar_convite(payload: ConviteCreateRequest):
     # ... (código idêntico)
@@ -101,7 +91,6 @@ async def criar_convite(payload: ConviteCreateRequest):
         print(f"❌ Erro ao criar convite: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.get("/convite/iniciar/{id_convite}/{email_jogador}", response_model=ConviteIniciarrResponse, tags=["Convite de Amigo"])
 async def iniciar_convite(id_convite: str, email_jogador: str):
     # ... (código idêntico)
@@ -111,10 +100,7 @@ async def iniciar_convite(id_convite: str, email_jogador: str):
         if not convite_doc.exists:
             raise HTTPException(status_code=404, detail="Convite não encontrado")
         convite_data = convite_doc.to_dict()
-        
-        # Esta função agora usa a nova coleção
         perguntas = await get_perguntas_aleatorias(convite_data.get("nivel", "iniciante"), 10)
-        
         return ConviteIniciarrResponse(
             perguntas=perguntas,
             id_convite=id_convite
@@ -123,15 +109,15 @@ async def iniciar_convite(id_convite: str, email_jogador: str):
         print(f"❌ Erro ao iniciar convite: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
+# --- 👇 ENDPOINT /convite/finalizar ATUALIZADO 👇 ---
 @router.post("/convite/finalizar", tags=["Convite de Amigo"])
 async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
-    # ... (código idêntico, incluindo a chamada para atualizar_moedas)
     try:
         convite_ref = db.collection("batalhas_convite").document(payload.id_convite)
         convite_doc = convite_ref.get()
         if not convite_doc.exists:
             raise HTTPException(status_code=404, detail="Partida de convite não encontrada")
+            
         partida_data = convite_doc.to_dict()
         
         eh_desafiante = (payload.email_jogador == partida_data.get("email_desafiante"))
@@ -153,10 +139,14 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
         placar_A = partida_data.get("pontuacao_desafiante")
         placar_B = partida_data.get("pontuacao_desafiado")
 
+        # Verifica se o oponente já jogou
         if placar_A is not None and placar_B is not None:
+            # AMBOS JOGARAM! O jogo acaba agora.
             update_data["status"] = "concluido"
             
             email_vencedor = None
+            moedas_ganhas = 0
+            
             if placar_A > placar_B:
                 email_vencedor = partida_data.get("email_desafiante")
                 update_data["vencedor"] = email_vencedor
@@ -166,20 +156,25 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
             else:
                 update_data["vencedor"] = "empate"
             
-            if email_vencedor: 
-                await atualizar_moedas(email_vencedor, 25) # 🪙
+            # Se EU sou o vencedor, calculo minhas moedas
+            if payload.email_jogador == email_vencedor:
+                await atualizar_moedas(payload.email_jogador, MOEDAS_VITORIA_CONVITE) # 🪙
+                moedas_ganhas = MOEDAS_VITORIA_CONVITE
             
             convite_ref.update(update_data)
             
             return {
                 "status_final": "CONCLUIDO",
-                "message": "Batalha finalizada!",
+                "message": f"Batalha finalizada! Placar: {placar_A} a {placar_B}",
                 "placar_desafiante": placar_A,
                 "placar_desafiado": placar_B,
-                "vencedor": update_data["vencedor"]
+                "vencedor": update_data["vencedor"],
+                "rank_change": 0, # Convite não muda rank
+                "moedas_ganhas": moedas_ganhas # <--- NOVO
             }
         
         else:
+            # O OPONENTE AINDA NÃO JOGOU
             if eh_desafiante:
                 update_data["status"] = "desafiante_jogou"
             else:
@@ -189,13 +184,16 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
             
             return {
                 "status_final": "AGUARDANDO_OPONENTE",
-                "message": "Seu placar foi salvo! Aguardando seu oponente jogar."
+                "message": "Seu placar foi salvo! Aguardando seu oponente jogar.",
+                "rank_change": 0, # <--- NOVO
+                "moedas_ganhas": 0 # <--- NOVO
             }
             
     except Exception as e:
         print(f"❌ Erro ao finalizar convite: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- (Endpoint /convite/pendentes - Sem alterações) ---
 @router.get("/convite/pendentes/{email_jogador}", tags=["Convite de Amigo"])
 async def get_convites_pendentes(email_jogador: str):
     # ... (código idêntico)
@@ -216,5 +214,5 @@ async def get_convites_pendentes(email_jogador: str):
         return {"success": True, "convites": lista_convites}
     
     except Exception as e:
-        print(f"❌ Erro ao buscar convites pendentes: {e}")
+        print(f"❌ Erro ao buscar convites_pendentes: {e}")
         raise HTTPException(status_code=500, detail=str(e))
