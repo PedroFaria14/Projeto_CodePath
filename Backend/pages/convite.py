@@ -227,24 +227,34 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
         print(f"❌ Erro ao finalizar convite: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- (Endpoint /convite/pendentes - Sem alterações) ---
 @router.get("/convite/pendentes/{email_jogador}", tags=["Convite de Amigo"])
 async def get_convites_pendentes(email_jogador: str):
-    # ... (código idêntico)
+    """
+    (BÔNUS) Endpoint para o Jogador B ver quais convites ele recebeu.
+    """
     try:
         convites_ref = db.collection("batalhas_convite")
+        
+        # 👇 --- CORREÇÃO AQUI --- 👇
+        # Agora busca convites que estão "pendentes" (ninguém jogou)
+        # OU "desafiante_jogou" (esperando por você)
+        status_validos = ["pendente", "desafiante_jogou"]
+        
         query = convites_ref.where(
             filter=FieldFilter("email_desafiado", "==", email_jogador)
         ).where(
-            filter=FieldFilter("status", "==", "pendente")
+            filter=FieldFilter("status", "in", status_validos) # <--- MUDADO DE '==' PARA 'in'
         ).limit(20)
+        # 👆 --- FIM DA CORREÇÃO --- 👆
         
         docs_pendentes = query.stream()
+        
         lista_convites = []
         for doc in docs_pendentes:
             convite_data = doc.to_dict()
             convite_data["id_convite"] = doc.id
             lista_convites.append(convite_data)
+
         return {"success": True, "convites": lista_convites}
     
     except Exception as e:
