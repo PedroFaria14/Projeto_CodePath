@@ -1,5 +1,5 @@
 # Arquivo: pages/batalha.py
-# (ATUALIZADO com recompensas na resposta)
+# (ATUALIZADO com sistema de Notificações)
 
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
@@ -16,22 +16,40 @@ router = APIRouter()
 RANK_CHANGE_VITORIA = 10
 RANK_CHANGE_DERROTA = -10
 MOEDAS_VITORIA_ALEATORIA = 50
+MOEDAS_DERROTA_EMPATE = 5 # <--- NOVO (Prêmio de consolação)
 
-# --- (Modelos Pydantic - Sem alterações) ---
+# --- (Modelos Pydantic) ---
 class BatalhaInitRequest(BaseModel):
     email: str
     nivel: str 
+
 class BatalhaFinalizarRequest(BaseModel):
     email: str
     pontuacao: int 
     tempo_gasto_segundos: float 
     id_batalha_oponente: Optional[str] = None
     pontuacao_oponente: Optional[int] = None
+
 class BatalhaInitResponse(BaseModel):
     tipo_batalha: str
     perguntas: List[Dict[str, Any]]
     id_batalha_oponente: Optional[str] = None
     pontuacao_oponente: Optional[int] = None
+
+# --- NOVOS MODELOS PARA NOTIFICAÇÃO ---
+class MarcarLidoRequest(BaseModel):
+    notificacao_id: str
+    
+class BatalhaNotificacao(BaseModel):
+    id: str
+    email: str
+    titulo: str
+    mensagem: str
+    rank_change: int
+    moedas_ganhas: int
+    lido: bool
+    timestamp: datetime.datetime
+
 
 # --- (Funções Auxiliares - get_perguntas_aleatorias, get_rank_score, etc. - Sem alterações) ---
 async def get_perguntas_aleatorias(nivel: str, count: int = 10) -> List[Dict[str, Any]]:
@@ -71,15 +89,15 @@ async def atualizar_rank(email: str, vitoria: bool):
     user_doc = user_ref_query[0]
     user_data = user_doc.to_dict()
     score_atual = user_data.get("rank_score", 1000)
-    
     if vitoria:
         score_novo = score_atual + RANK_CHANGE_VITORIA
     else:
-        score_novo = max(score_atual + RANK_CHANGE_DERROTA, 0) # Adiciona o negativo
-        
+        score_novo = max(score_atual + RANK_CHANGE_DERROTA, 0)
     user_doc.reference.update({"rank_score": score_novo})
 
 async def atualizar_moedas(email: str, quantidade: int):
+    if quantidade <= 0: # Não faz nada se for 0
+        return
     user_ref_query = db.collection("usuarios").where(filter=FieldFilter("email", "==", email)).limit(1).get()
     if not user_ref_query:
         return
@@ -147,64 +165,135 @@ async def finalizar_batalha(payload: BatalhaFinalizarRequest):
             return {
                 "status_final": "AGUARDANDO_OPONENTE",
                 "message": "Placar salvo! Assim que um oponente jogar, avisaremos o resultado.",
-                "rank_change": 0, # Nada muda ainda
+                "rank_change": 0,
                 "moedas_ganhas": 0
             }
 
         # CASO 2: "DESAFIO_EXISTENTE" (Resultado imediato)
         pontuacao_oponente = payload.pontuacao_oponente 
         
+        oponente_ref = db.collection("batalha_queue").document(payload.id_batalha_oponente).get()
+        email_oponente = oponente_ref.to_dict().get("email_jogador")
+        
         # VITORIA
         if payload.pontuacao > pontuacao_oponente:
             await atualizar_rank(payload.email, vitoria=True) 
             await atualizar_moedas(payload.email, MOEDAS_VITORIA_ALEATORIA) 
+            await atualizar_rank(email_oponente, vitoria=False)
+            await atualizar_moedas(email_oponente, MOEDAS_DERROTA_EMPATE) # Oponente ganha prêmio de consolação
             
-            oponente_ref = db.collection("batalha_queue").document(payload.id_batalha_oponente).get()
-            if oponente_ref.exists:
-                email_oponente = oponente_ref.to_dict().get("email_jogador")
-                await atualizar_rank(email_oponente, vitoria=False)
+            # CRIA NOTIFICAÇÃO PARA O OPONENTE OFFLINE
+            db.collection("notificacoes").add({
+                "email": email_oponente,
+                "titulo": "Você Perdeu!",
+                "mensagem": f"Seu oponente venceu a Batalha Aleatória ({pontuacao_oponente} a {payload.pontuacao}).",
+                "rank_change": RANK_CHANGE_DERROTA,
+                "moedas_ganhas": MOEDAS_DERROTA_EMPATE,
+                "lido": False,
+                "timestamp": datetime.datetime.utcnow()
+            })
             
             db.collection("batalha_queue").document(payload.id_batalha_oponente).delete()
             
             return {
                 "status_final": "VITORIA",
                 "message": f"Você Venceu! ({payload.pontuacao} a {pontuacao_oponente})",
-                "placar_seu": payload.pontuacao,
-                "placar_oponente": pontuacao_oponente,
-                "rank_change": RANK_CHANGE_VITORIA, # <--- NOVO
-                "moedas_ganhas": MOEDAS_VITORIA_ALEATORIA # <--- NOVO
+                "rank_change": RANK_CHANGE_VITORIA,
+                "moedas_ganhas": MOEDAS_VITORIA_ALEATORIA
             }
         
         # DERROTA
         elif payload.pontuacao < pontuacao_oponente:
             await atualizar_rank(payload.email, vitoria=False) 
+            await atualizar_moedas(payload.email, MOEDAS_DERROTA_EMPATE) # Prêmio de consolação
+            await atualizar_rank(email_oponente, vitoria=True)
+            await atualizar_moedas(email_oponente, MOEDAS_VITORIA_ALEATORIA) # Oponente ganha
             
-            oponente_ref = db.collection("batalha_queue").document(payload.id_batalha_oponente).get()
-            if oponente_ref.exists:
-                email_oponente = oponente_ref.to_dict().get("email_jogador")
-                await atualizar_rank(email_oponente, vitoria=True)
+            # CRIA NOTIFICAÇÃO PARA O OPONENTE OFFLINE
+            db.collection("notificacoes").add({
+                "email": email_oponente,
+                "titulo": "Você Venceu!",
+                "mensagem": f"Você venceu a Batalha Aleatória ({pontuacao_oponente} a {payload.pontuacao})!",
+                "rank_change": RANK_CHANGE_VITORIA,
+                "moedas_ganhas": MOEDAS_VITORIA_ALEATORIA,
+                "lido": False,
+                "timestamp": datetime.datetime.utcnow()
+            })
                 
             db.collection("batalha_queue").document(payload.id_batalha_oponente).delete()
             return {
                 "status_final": "DERROTA",
                 "message": f"Você Perdeu. ({payload.pontuacao} a {pontuacao_oponente})",
-                "placar_seu": payload.pontuacao,
-                "placar_oponente": pontuacao_oponente,
-                "rank_change": RANK_CHANGE_DERROTA, # <--- NOVO
-                "moedas_ganhas": 0 # <--- NOVO
+                "rank_change": RANK_CHANGE_DERROTA,
+                "moedas_ganhas": MOEDAS_DERROTA_EMPATE 
             }
         
         # EMPATE
         else:
+            await atualizar_moedas(payload.email, MOEDAS_DERROTA_EMPATE) # Prêmio de consolação
+            await atualizar_moedas(email_oponente, MOEDAS_DERROTA_EMPATE) # Prêmio de consolação
+            
+            # CRIA NOTIFICAÇÃO PARA O OPONENTE OFFLINE
+            db.collection("notificacoes").add({
+                "email": email_oponente,
+                "titulo": "Empate!",
+                "mensagem": f"Você empatou a Batalha Aleatória ({pontuacao_oponente} a {payload.pontuacao}).",
+                "rank_change": 0,
+                "moedas_ganhas": MOEDAS_DERROTA_EMPATE,
+                "lido": False,
+                "timestamp": datetime.datetime.utcnow()
+            })
+            
             db.collection("batalha_queue").document(payload.id_batalha_oponente).delete()
             return {
                 "status_final": "EMPATE",
                 "message": f"Empate! ({payload.pontuacao} a {pontuacao_oponente})",
-                "placar_seu": payload.pontuacao,
-                "placar_oponente": pontuacao_oponente,
-                "rank_change": 0, # <--- NOVO
-                "moedas_ganhas": 0 # <--- NOVO
+                "rank_change": 0,
+                "moedas_ganhas": MOEDAS_DERROTA_EMPATE
             }
     except Exception as e:
         print(f"❌ Erro ao finalizar batalha: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- 👇 NOVOS ENDPOINTS DE NOTIFICAÇÃO 👇 ---
+
+@router.get("/notificacoes/pendentes/{email}", response_model=List[BatalhaNotificacao], tags=["Notificações"])
+async def get_notificacoes_pendentes(email: str):
+    """
+    Busca todas as notificações de resultado de batalha não lidas
+    para um usuário.
+    """
+    try:
+        notif_ref = db.collection("notificacoes").where(
+            filter=FieldFilter("email", "==", email)
+        ).where(
+            filter=FieldFilter("lido", "==", False)
+        ).order_by("timestamp", direction=firestore.Query.DESCENDING).limit(10)
+        
+        docs = notif_ref.stream()
+        
+        notificacoes = []
+        for doc in docs:
+            notif_data = doc.to_dict()
+            notif_data["id"] = doc.id
+            notificacoes.append(notif_data)
+            
+        return notificacoes
+    except Exception as e:
+        print(f"❌ Erro ao buscar notificações: {e}")
+        return [] # Retorna lista vazia em caso de erro
+
+@router.post("/notificacoes/marcar_como_lido", tags=["Notificações"])
+async def marcar_notificacao_lida(payload: MarcarLidoRequest):
+    """
+    Marca uma notificação específica como 'lida' para não aparecer de novo.
+    """
+    try:
+        notif_ref = db.collection("notificacoes").document(payload.notificacao_id)
+        notif_ref.update({
+            "lido": True
+        })
+        return {"success": True, "message": "Notificação marcada como lida."}
+    except Exception as e:
+        print(f"❌ Erro ao marcar notificação como lida: {e}")
         raise HTTPException(status_code=500, detail=str(e))
