@@ -12,7 +12,7 @@ from typing import List, Dict, Any, Optional
 
 # Tenta importar a função ATUALIZADA de 'batalha.py'
 try:
-    from pages.batalha import get_perguntas_aleatorias
+    from pages.battles import get_perguntas_aleatorias
 except ImportError:
     print("WARNING: Falha ao importar 'get_perguntas_aleatorias' de batalha.py. Usando fallback.")
     async def get_perguntas_aleatorias(nivel: str, count: int = 10) -> List[Dict[str, Any]]:
