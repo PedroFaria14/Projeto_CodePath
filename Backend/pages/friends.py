@@ -301,7 +301,7 @@ async def get_sugestoes_amigos(email_jogador: str):
 
         # Embaralha a lista e pega 5
         random.shuffle(lista_usuarios)
-        sugestoes = lista_usuarios[:5] 
+        sugestoes = lista_usuarios[:8] 
         
         return {"success": True, "sugestoes": sugestoes}
 
