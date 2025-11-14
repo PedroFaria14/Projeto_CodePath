@@ -38,7 +38,6 @@ except ImportError:
 
 router = APIRouter()
 
-# --- CONSTANTES DE RECOMPENSA ---
 MOEDAS_VITORIA_CONVITE = 25
 MOEDAS_DERROTA_EMPATE_CONVITE = 5 
 
