@@ -9,6 +9,7 @@ from google.cloud.firestore_v1 import Increment
 from google.cloud.firestore_v1.base_query import FieldFilter
 import random
 from typing import List, Dict, Any, Optional
+from google.cloud import firestore
 
 router = APIRouter()
 
