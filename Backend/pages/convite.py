@@ -10,7 +10,7 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 import random
 from typing import List, Dict, Any, Optional
 
-# Tenta importar a função ATUALIZADA de 'batalha.py'
+
 try:
     from pages.battles import get_perguntas_aleatorias
 except ImportError:
