@@ -2,15 +2,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 import os
 
-# 🚀 VERIFICA O CAMINHO DA SUA CHAVE DO FIREBASE
-# (Assumindo que o JSON está na MESMA pasta que este script)
-cred_path = "firebase-service-account.json" 
-if not os.path.exists(cred_path):
-    print(f"Erro: Arquivo de credenciais não encontrado em '{cred_path}'")
-    print("Por favor, baixe seu service-account.json e coloque-o nesta pasta.")
-    exit()
-    
-cred = credentials.Certificate(cred_path)
+cred = credentials.Certificate("../firebase-service-account.json")
 firebase_admin.initialize_app(cred)
 
 db = firestore.client()
@@ -229,6 +221,8 @@ questions_data = [
         "opcoes": ["1", "2", "3", "4"],
         "resposta_correta": "4"
     },
+    
+    
     
     # --------------------------------------------- #
     #  PERGUNTAS DE QUIZ (para a Batalha Aleatória)
