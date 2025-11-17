@@ -1,4 +1,4 @@
-# Arquivo: pages/desafio.py (ATUALIZADO para nova coleção)
+# Arquivo: pages/desafio.py (ATUALIZADO com Rotação de Módulo)
 
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
@@ -11,13 +11,21 @@ from typing import List, Dict, Any
 router = APIRouter()
 
 # --- Constantes do Desafio ---
-MODULO_DA_SEMANA = "Condicionais" # Mude isso manualmente toda semana
-QTD_PERGUNTAS_DESAFIO = 5 # O desafio terá 5 perguntas
-PONTUACAO_MINIMA = 3 # Mínimo de acertos para ganhar
+
+# 🚀 LISTA DOS MÓDULOS QUE TÊM PERGUNTAS DE CÓDIGO
+# Adicione novos módulos aqui quando você criar perguntas para eles
+MODULOS_DO_DESAFIO = [
+    "Condicionais",
+    "Variáveis e Tipos",
+    "Laços de Repetição"
+    # "Funções" # (Adicione quando tiver perguntas)
+]
+
+QTD_PERGUNTAS_DESAFIO = 5
+PONTUACAO_MINIMA = 3
 RECOMPENSA_MOEDAS = 150
 RECOMPENSA_RANK_VITORIA = 30
 RECOMPENSA_RANK_DERROTA = -5
-# 🚀 NOVA COLEÇÃO
 COLECAO_DESAFIO = "desafio_perguntas" 
 
 class DesafioRequest(BaseModel):
@@ -28,11 +36,33 @@ class DesafioFinalizarRequest(BaseModel):
     pontuacao: int # Quantos acertou (de 5)
 
 def get_semana_atual() -> int:
-    return datetime.date.today().isocalendar()[1]
+    """ Retorna o número da semana no ano (1 a 53) """
+    return datetime.date.today().isocalendar()[1] # [1] pega a semana
+
+# 🚀 NOVA FUNÇÃO PARA ESCOLHER O MÓDULO DA SEMANA
+def get_modulo_da_semana() -> str:
+    """
+    Seleciona um módulo da lista baseado no número da semana.
+    Isso garante que ele rode automaticamente.
+    """
+    semana_atual = get_semana_atual()
+    num_modulos = len(MODULOS_DO_DESAFIO)
+    
+    if num_modulos == 0:
+        return "Condicionais" # Um módulo padrão caso a lista esteja vazia
+        
+    # Usa o operador "módulo" (%) para ciclar pela lista
+    # Ex: Semana 1 % 3 = 1 -> Módulo 1
+    # Ex: Semana 2 % 3 = 2 -> Módulo 2
+    # Ex: Semana 3 % 3 = 0 -> Módulo 0
+    # Ex: Semana 4 % 3 = 1 -> Módulo 1 (volta pro primeiro)
+    indice_modulo = semana_atual % num_modulos
+    return MODULOS_DO_DESAFIO[indice_modulo]
 
 # --- Funções Auxiliares (copiadas) ---
 
 async def atualizar_moedas(email: str, quantidade: int):
+    """ Atualiza as moedas do usuário """
     if quantidade <= 0:
         return
     user_ref_query = db.collection("usuarios").where(filter=FieldFilter("email", "==", email)).limit(1).get()
@@ -42,6 +72,7 @@ async def atualizar_moedas(email: str, quantidade: int):
     user_doc.reference.update({ "moedas": Increment(quantidade) })
 
 async def atualizar_weekly_score(email: str, vitoria: bool):
+    """ Atualiza o 'weekly_score' (placar semanal) do usuário. """
     user_ref_query = db.collection("usuarios").where(filter=FieldFilter("email", "==", email)).limit(1).get()
     if not user_ref_query:
         return
@@ -67,12 +98,15 @@ async def atualizar_weekly_score(email: str, vitoria: bool):
 async def iniciar_desafio(payload: DesafioRequest):
     """
     Verifica se o usuário já jogou e retorna 5 perguntas de código
-    da coleção 'desafio_perguntas'.
+    do MÓDULO DA SEMANA (escolhido automaticamente).
     """
     try:
         semana_atual = get_semana_atual()
         
-        # 1. Verifica se o usuário já jogou
+        # 1. 🚀 ESCOLHE O MÓDULO DA SEMANA AUTOMATICAMENTE
+        modulo_da_semana = get_modulo_da_semana()
+        
+        # 2. Verifica se o usuário já jogou
         user_ref_query = db.collection("usuarios").where(filter=FieldFilter("email", "==", payload.email)).limit(1).get()
         if not user_ref_query:
             raise HTTPException(status_code=404, detail="Usuário não encontrado")
@@ -83,21 +117,22 @@ async def iniciar_desafio(payload: DesafioRequest):
         semana_ultimo_desafio = user_data.get("semana_ultimo_desafio", 0)
         
         if semana_ultimo_desafio == semana_atual:
-            raise HTTPException(status_code=403, detail="Você já completou o desafio desta semana! Volte na próxima.")
+            raise HTTPException(status_code=403, detail=f"Você já completou o desafio desta semana! O módulo é: {modulo_da_semana}.")
 
-        # 2. Busca as 5 perguntas de código da NOVA COLEÇÃO
+        # 3. Busca as 5 perguntas de código do módulo da semana
         perguntas_ref = db.collection(COLECAO_DESAFIO).where(
-            filter=FieldFilter("modulo", "==", MODULO_DA_SEMANA)
-        ).stream() # Não filtra mais por 'tipo', já que todas são de desafio
+            filter=FieldFilter("modulo", "==", modulo_da_semana) # 🚀 USA A VARIÁVEL
+        ).stream() 
         
         lista_perguntas = [doc.to_dict() for doc in perguntas_ref]
         
         if len(lista_perguntas) < QTD_PERGUNTAS_DESAFIO:
-            raise HTTPException(status_code=404, detail=f"Erro: Perguntas de desafio insuficientes ({len(lista_perguntas)}/{QTD_PERGUNTAS_DESAFIO}) para o módulo '{MODULO_DA_SEMANA}'.")
+            raise HTTPException(status_code=404, detail=f"Erro: Perguntas de desafio insuficientes ({len(lista_perguntas)}/{QTD_PERGUNTAS_DESAFIO}) para o módulo '{modulo_da_semana}'.")
 
         perguntas_escolhidas = random.sample(lista_perguntas, QTD_PERGUNTAS_DESAFIO)
 
-        return {"success": True, "perguntas": perguntas_escolhidas}
+        # Retorna as perguntas E o nome do módulo (para o app mostrar)
+        return {"success": True, "perguntas": perguntas_escolhidas, "modulo": modulo_da_semana}
 
     except HTTPException as http_exc:
         raise http_exc
@@ -125,7 +160,7 @@ async def finalizar_desafio(payload: DesafioFinalizarRequest):
         rank_change = 0
         vitoria = False
         
-        if payload.pontuacao >= PONTUACAO_MINIMA:
+        if payload.pontuacao >= PONTUACAO_MINIMA: 
             moedas_ganhas = RECOMPENSA_MOEDAS
             rank_change = RECOMPENSA_RANK_VITORIA
             vitoria = True
