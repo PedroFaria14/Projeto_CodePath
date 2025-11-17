@@ -27,9 +27,23 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verifica se a senha pura bate com o hash."""
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
-# (Sua constante INITIAL_FASES)
+# 🚀 CONSTANTE PREENCHIDA (copiada do seu register.py)
 INITIAL_FASES = {
-    # ... (cole sua constante INITIAL_FASES aqui) ...
+    "Laços de Repetição": [
+        {"id": 1, "liberada": True, "atual": True},
+        {"id": 2, "liberada": False, "atual": False},
+        {"id": 3, "liberada": False, "atual": False}
+    ],
+    "Condicionais": [
+        {"id": 1, "liberada": True, "atual": True},
+        {"id": 2, "liberada": False, "atual": False},
+        {"id": 3, "liberada": False, "atual": False}
+    ],
+    "Variáveis": [
+        {"id": 1, "liberada": True, "atual": True},
+        {"id": 2, "liberada": False, "atual": False},
+        {"id": 3, "liberada": False, "atual": False}
+    ]
 }
 
 @router.post("/login", response_model=ApiResponse)
@@ -91,6 +105,8 @@ async def login_user(user: UserLogin):
             streak = 1
             
         
+        # --- LÓGICA DE ATUALIZAÇÃO DE CAMPOS FALTANTES ---
+        
         # Correção de 'fases' (mantida)
         if 'fases' not in user_data or not isinstance(user_data['fases'], dict):
             user_doc.reference.update({'fases': INITIAL_FASES})
@@ -103,6 +119,11 @@ async def login_user(user: UserLogin):
         if 'moedas' not in user_data:
             user_doc.reference.update({'moedas': 0})
             user_data['moedas'] = 0
+            
+        # 🚀 ADICIONADO: Verifica e adiciona o placar semanal se não existir
+        if 'weekly_score' not in user_data:
+            user_doc.reference.update({'weekly_score': 1000})
+            user_data['weekly_score'] = 1000
             
         # Atualiza Firestore
         user_doc.reference.update({

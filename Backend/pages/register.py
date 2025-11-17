@@ -26,7 +26,7 @@ def hash_password(password: str) -> str:
     hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
     return hashed.decode('utf-8')
 
-# (Sua constante INITIAL_FASES - mantenha como está)
+# (Sua constante INITIAL_FASES)
 INITIAL_FASES = {
     "Laços de Repetição": [
         {"id": 1, "liberada": True, "atual": True},
@@ -86,7 +86,8 @@ async def register_user(user: UserRegister):
             "fases": INITIAL_FASES,
             
             "moedas": 0,
-            "rank_score": 1000  
+            "rank_score": 1000,
+            "weekly_score": 1000  # 🚀 ADICIONADO O PLACAR SEMANAL
         }
 
         users_ref.add(user_data)
