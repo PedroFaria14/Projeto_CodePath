@@ -19,9 +19,11 @@ from pages.update_nivel import router as update_nivel_router
 from pages.leasson import router as leasson_router
 from pages.progress import router as progress
 from pages import forgotPass
-from pages.battles import router as desafio_router
+from pages.battles import router as desafio_batalha
 from pages.convite import router as convite_router
 from pages.friends import router as friends_router
+from pages.desafio import router as desafio_router
+
 
 PORT = 8000
 
@@ -60,6 +62,7 @@ app.include_router(leasson_router)
 app.include_router(profile_router)
 app.include_router(progress)
 app.include_router(forgotPass.router, tags=["Password Reset"])
-app.include_router(desafio_router)
+app.include_router(desafio_batalha)
 app.include_router(convite_router)
 app.include_router(friends_router)
+app.include_router(desafio_router)
