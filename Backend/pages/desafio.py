@@ -1,4 +1,4 @@
-# Arquivo: pages/desafio.py (CORRIGIDO com 3 Estágios em ORDEM)
+# Arquivo: pages/desafio.py (Com 3 Fases: Múltipla Escolha, Preencher Lacuna, Drag & Drop)
 
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
@@ -10,30 +10,36 @@ from typing import List, Dict, Any
 
 router = APIRouter()
 
-# --- Constantes do Desafio ---
+# --- Constantes do Desafio (ATUALIZADAS para 3, 4, 3) ---
 MODULO_DA_SEMANA = "Condicionais" 
-QTD_FACIL = 3
-QTD_DIFICIL = 5
-QTD_CODIGO = 1
-QTD_TOTAL = QTD_FACIL + QTD_DIFICIL + QTD_CODIGO # Total de 9 perguntas
-PONTUACAO_MINIMA = 5 # Mínimo de acertos para ganhar (de 9)
+
+# NOVAS QUANTIDADES POR FASE
+QTD_FASE1_MULTIPLA_ESCOLHA = 3   # Múltipla Escolha
+QTD_FASE2_PREENCHER_LACUNA = 4   # Preencher Lacuna (Antigo Código Snippet)
+QTD_FASE3_DRAG_DROP = 3          # Drag & Drop (NOVA FASE)
+
+QTD_TOTAL = QTD_FASE1_MULTIPLA_ESCOLHA + QTD_FASE2_PREENCHER_LACUNA + QTD_FASE3_DRAG_DROP # Total de 10 perguntas
+
+PONTUACAO_MINIMA = 6 # Mínimo de acertos para ganhar (de 10)
 RECOMPENSA_MOEDAS = 150
 RECOMPENSA_RANK_VITORIA = 30
 RECOMPENSA_RANK_DERROTA = -5
-COLECAO_DESAFIO = "desafio_perguntas" 
-COLECAO_BATALHA = "batalhas_perguntas" 
+
+COLECAO_FASE1 = "batalhas_perguntas"      # Múltipla Escolha (usa a coleção original)
+COLECAO_FASE2 = "desafio_perguntas"       # Preencher Lacuna 
+COLECAO_FASE3 = "desafio_montar_codigo"   # COLEÇÃO NOVA para Drag & Drop
 
 class DesafioRequest(BaseModel):
     email: str
 
 class DesafioFinalizarRequest(BaseModel):
     email: str
-    pontuacao: int # Quantos acertou (de 9)
+    pontuacao: int # Quantos acertou (de 10)
 
 def get_semana_atual() -> int:
     return datetime.date.today().isocalendar()[1]
 
-# --- Funções Auxiliares (copiadas) ---
+# --- Funções Auxiliares (mantidas e adaptadas) ---
 
 async def atualizar_moedas(email: str, quantidade: int):
     """ Atualiza as moedas do usuário """
@@ -65,32 +71,32 @@ async def atualizar_weekly_score(email: str, vitoria: bool):
         
     user_doc.reference.update({"weekly_score": score_novo})
 
-async def get_perguntas_do_modulo(colecao: str, modulo: str, dificuldade: str, count: int) -> List[Dict[str, Any]]:
-    """ Busca perguntas por Módulo e Dificuldade na coleção especificada """
+async def get_perguntas_fase1(modulo: str, count: int) -> List[Dict[str, Any]]:
+    """ Busca 'count' perguntas de Múltipla Escolha (Fácil ou Difícil) na COLECAO_FASE1 """
     try:
-        # Busca perguntas que NÃO são do tipo codigo_snippet
-        query = db.collection(colecao).where(
+        # Busca perguntas que NÃO são do tipo codigo_snippet para a Fase 1
+        query = db.collection(COLECAO_FASE1).where(
             filter=FieldFilter("modulo", "==", modulo)
         ).where(
-            filter=FieldFilter("nivel", "==", dificuldade)
-        ).where(
-            filter=FieldFilter("tipo", "!=", "codigo_snippet")
+            # Garante que não pegamos o código snippet antigo que seria da fase 2
+            filter=FieldFilter("tipo", "!=", "codigo_snippet") 
         )
         
         perguntas_ref = query.stream()
         lista_perguntas = [doc.to_dict() for doc in perguntas_ref]
         
         if not lista_perguntas:
-             raise Exception(f"Nenhuma pergunta encontrada para {modulo} / {dificuldade} em {colecao}")
-             
+            raise Exception(f"Nenhuma pergunta encontrada para Múltipla Escolha em {COLECAO_FASE1}")
+            
         num_a_pegar = min(count, len(lista_perguntas))
         if len(lista_perguntas) < count:
-            print(f"AVISO: Pedido {count} perguntas '{dificuldade}', mas só existem {len(lista_perguntas)}.")
+             print(f"AVISO: Pedido {count} perguntas Múltipla Escolha, mas só existem {len(lista_perguntas)}.")
             
+        # Pega aleatoriamente a quantidade necessária (Misturando Fácil e Difícil)
         return random.sample(lista_perguntas, num_a_pegar)
         
     except Exception as e:
-        print(f"❌ Erro ao buscar perguntas do módulo: {e}")
+        print(f"❌ Erro ao buscar perguntas da Fase 1: {e}")
         return []
 
 # --- Fim das Funções Auxiliares ---
@@ -99,14 +105,14 @@ async def get_perguntas_do_modulo(colecao: str, modulo: str, dificuldade: str, c
 @router.post("/desafio/iniciar", tags=["Desafio Semanal"])
 async def iniciar_desafio(payload: DesafioRequest):
     """
-    Verifica se o usuário já jogou e retorna as 9 perguntas do desafio
-    (3 Faceis, 5 Dificeis, 1 Código).
+    Verifica se o usuário já jogou e retorna as 10 perguntas em 3 Fases:
+    (3 Múltipla Escolha, 4 Preencher Lacuna, 3 Drag & Drop).
     """
     try:
         semana_atual = get_semana_atual()
         modulo_da_semana = MODULO_DA_SEMANA 
         
-        # 2. Verifica se o usuário já jogou
+        # 1. Verifica se o usuário já jogou (Lógica mantida)
         user_ref_query = db.collection("usuarios").where(filter=FieldFilter("email", "==", payload.email)).limit(1).get()
         if not user_ref_query:
             raise HTTPException(status_code=404, detail="Usuário não encontrado")
@@ -119,35 +125,56 @@ async def iniciar_desafio(payload: DesafioRequest):
         if semana_ultimo_desafio == semana_atual:
             raise HTTPException(status_code=403, detail=f"Você já completou o desafio desta semana! O módulo é: {modulo_da_semana}.")
 
-        # 3. Busca as perguntas em 3 estágios
+        # --- 2. Busca as perguntas nas 3 FASES EM ORDEM ---
         
-        # Estágio 1: 3 Fáceis
-        perguntas_faceis = await get_perguntas_do_modulo(COLECAO_BATALHA, modulo_da_semana, "Facil", QTD_FACIL)
+        # FASE 1: Múltipla Escolha (3 perguntas)
+        perguntas_fase1 = await get_perguntas_fase1(modulo_da_semana, QTD_FASE1_MULTIPLA_ESCOLHA)
         
-        # Estágio 2: 5 Difíceis
-        perguntas_dificeis = await get_perguntas_do_modulo(COLECAO_BATALHA, modulo_da_semana, "Dificil", QTD_DIFICIL)
-        
-        # Estágio 3: 1 Desafio de Código
-        perguntas_codigo_ref = db.collection(COLECAO_DESAFIO).where(
+        # FASE 2: Preencher Lacuna (4 exercícios) - (Do tipo codigo_snippet)
+        query_fase2 = db.collection(COLECAO_FASE2).where(
             filter=FieldFilter("modulo", "==", modulo_da_semana)
-        ).stream()
+        ).where(
+            filter=FieldFilter("tipo", "==", "codigo_snippet") # Garante que seja o formato de código
+        )
+        perguntas_fase2_ref = query_fase2.stream()
+        lista_fase2 = [doc.to_dict() for doc in perguntas_fase2_ref]
         
-        lista_codigo = [doc.to_dict() for doc in perguntas_codigo_ref]
+        if len(lista_fase2) < QTD_FASE2_PREENCHER_LACUNA:
+            raise HTTPException(status_code=404, detail="Erro: Perguntas de Preencher Lacuna insuficientes.")
+            
+        perguntas_fase2 = random.sample(lista_fase2, QTD_FASE2_PREENCHER_LACUNA)
         
-        if not lista_codigo:
-             raise HTTPException(status_code=404, detail="Erro: Nenhuma pergunta de 'Desafio de Código' encontrada para este módulo.")
+        # FASE 3: Drag & Drop (3 exercícios) - (Nova Coleção)
+        query_fase3 = db.collection(COLECAO_FASE3).where(
+            filter=FieldFilter("modulo", "==", modulo_da_semana)
+        )
+        perguntas_fase3_ref = query_fase3.stream()
+        lista_fase3 = [doc.to_dict() for doc in perguntas_fase3_ref]
         
-        perguntas_codigo = random.sample(lista_codigo, QTD_CODIGO)
+        if len(lista_fase3) < QTD_FASE3_DRAG_DROP:
+             raise HTTPException(status_code=404, detail="Erro: Perguntas de Montar Código (D&D) insuficientes.")
+            
+        perguntas_fase3 = random.sample(lista_fase3, QTD_FASE3_DRAG_DROP)
         
-        # Validação
-        if len(perguntas_faceis) < QTD_FACIL or len(perguntas_dificeis) < QTD_DIFICIL or len(perguntas_codigo) < QTD_CODIGO:
-             raise HTTPException(status_code=404, detail="Erro: Perguntas insuficientes para o desafio desta semana.")
+        # Validação Final (Adaptada)
+        if (len(perguntas_fase1) < QTD_FASE1_MULTIPLA_ESCOLHA or 
+            len(perguntas_fase2) < QTD_FASE2_PREENCHER_LACUNA or 
+            len(perguntas_fase3) < QTD_FASE3_DRAG_DROP):
+            raise HTTPException(status_code=404, detail="Erro: Perguntas insuficientes para o desafio desta semana em alguma das fases.")
 
         # 🚀 A MUDANÇA ESTÁ AQUI 🚀
-        # Nós juntamos as listas EM ORDEM, sem embaralhar.
-        todas_perguntas = perguntas_faceis + perguntas_dificeis + perguntas_codigo
-        # random.shuffle(todas_perguntas) # <-- LINHA REMOVIDA
-
+        # 3. Juntamos as listas EM ORDEM, e adicionamos a marcação da Fase para o Frontend
+        
+        # O ideal é que o 'tipo_interacao' (ou 'fase') seja definido no Banco. 
+        # Para que o Frontend saiba qual layout usar, vamos adicionar um campo 'fase' 
+        # antes de juntar as listas.
+        
+        for p in perguntas_fase1: p['fase'] = 1
+        for p in perguntas_fase2: p['fase'] = 2
+        for p in perguntas_fase3: p['fase'] = 3
+        
+        todas_perguntas = perguntas_fase1 + perguntas_fase2 + perguntas_fase3
+        
         return {"success": True, "perguntas": todas_perguntas, "modulo": modulo_da_semana}
 
     except HTTPException as http_exc:
@@ -160,7 +187,7 @@ async def iniciar_desafio(payload: DesafioRequest):
 @router.post("/desafio/finalizar", tags=["Desafio Semanal"])
 async def finalizar_desafio(payload: DesafioFinalizarRequest):
     """
-    Recebe a pontuação (de 9), calcula recompensas e marca o usuário.
+    Recebe a pontuação (de 10), calcula recompensas e marca o usuário.
     """
     try:
         semana_atual = get_semana_atual()
@@ -171,12 +198,12 @@ async def finalizar_desafio(payload: DesafioFinalizarRequest):
         
         user_doc = user_ref_query[0]
 
-        # 2. Calcula recompensas
+        # 2. Calcula recompensas (Lógica mantida, ajustada para QTD_TOTAL=10)
         moedas_ganhas = 0
         rank_change = 0
         vitoria = False
         
-        if payload.pontuacao >= PONTUACAO_MINIMA: # (Ex: 5 de 9)
+        if payload.pontuacao >= PONTUACAO_MINIMA: # (Ex: 6 de 10)
             moedas_ganhas = RECOMPENSA_MOEDAS
             rank_change = RECOMPENSA_RANK_VITORIA
             vitoria = True
@@ -186,7 +213,7 @@ async def finalizar_desafio(payload: DesafioFinalizarRequest):
             
         await atualizar_weekly_score(payload.email, vitoria=vitoria) 
 
-        # 3. Marca que o usuário completou o desafio
+        # 3. Marca que o usuário completou o desafio (Lógica mantida)
         user_doc.reference.update({
             "semana_ultimo_desafio": semana_atual
         })
