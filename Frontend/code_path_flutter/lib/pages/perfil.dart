@@ -1,12 +1,23 @@
+// Arquivo: perfil.dart (ATUALIZADO COM PROVIDER)
+
 import 'dart:convert';
 import 'package:codepath/pages/EditarPerfil.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart'; // Import para formatar datas
+import 'package:intl/intl.dart';
 import 'login.dart';
 import 'tela_configuracao.dart';
-import 'EditarPerfil.dart';
+// import 'EditarPerfil.dart'; // Removido, já importado acima
+
+// 🚀 IMPORTS DO PROVIDER
+import 'package:provider/provider.dart';
+import 'package:codepath/providers/user_provider.dart';
+
+// Imports das novas páginas
+import 'amigos_adicionar_hub_page.dart';
+import 'convites_page.dart';
+import 'amigos_page.dart'; // <--- PÁGINA CENTRAL DE AMIGOS
 
 class PerfilPage extends StatefulWidget {
   const PerfilPage({super.key});
@@ -16,65 +27,97 @@ class PerfilPage extends StatefulWidget {
 }
 
 class _PerfilPageState extends State<PerfilPage> {
-  Map<String, dynamic>? usuario;
-  bool carregando = true;
+  // 🚀 REMOVIDO: Map<String, dynamic>? usuario;
+  // 🚀 REMOVIDO: bool carregando = true;
+
+  int _totalConvites = 0;
+  int _amigosCount = 0;
+
+  final String _baseUrl = "https://projeto-codepath.onrender.com";
 
   @override
   void initState() {
     super.initState();
-    carregarUsuario();
+    // 🚀 A FUNÇÃO 'carregarUsuario' AGORA SÓ CARREGA OS CONTADORES
+    carregarContadores();
   }
 
-  // Função para buscar os dados do usuário no backend
-  Future<void> carregarUsuario() async {
-    // Garante que o indicador de loading apareça ao recarregar
+  // 🚀 FUNÇÃO 'carregarUsuario' RENOMEADA E SIMPLIFICADA
+  Future<void> carregarContadores() async {
+    // Reseta os contadores
     setState(() {
-      carregando = true;
+      _totalConvites = 0;
+      _amigosCount = 0;
     });
+
     final prefs = await SharedPreferences.getInstance();
     final email = prefs.getString("userEmail") ?? "";
 
-    // Se não houver email, para a execução
     if (email.isEmpty) {
-      if (mounted) {
-        setState(() => carregando = false);
-      }
       return;
     }
 
+    // Carrega apenas os dados que NÃO ESTÃO no UserProvider
+    _carregarContagemConvites(email);
+    _carregarContagemAmigos(email);
+  }
+
+  // --- (Função _carregarContagemConvites - sem alterações) ---
+  Future<void> _carregarContagemConvites(String email) async {
+    int total = 0;
     try {
-      final response = await http.get(
-        Uri.parse("https://projeto-codepath.onrender.com/profile/$email"),
+      final resAmigos = await http.get(
+        Uri.parse("$_baseUrl/amigos/pedidos_pendentes/$email"),
       );
-
-      if (!mounted) return; // Verifica se o widget ainda está montado
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data["success"] == true) {
-          setState(() {
-            usuario = data["user"];
-          });
-        } else {
-          debugPrint("API respondeu com sucesso=false: ${data["message"]}");
-        }
-      } else {
-        debugPrint("Erro HTTP ao carregar perfil: ${response.statusCode}");
+      if (mounted && resAmigos.statusCode == 200) {
+        final data = jsonDecode(resAmigos.body);
+        total += (data["pedidos"] as List).length;
       }
-    } catch (e) {
-      debugPrint("Erro de conexão ao carregar perfil: $e");
-    } finally {
-      // Garante que o loading saia, mesmo se der erro
+      final resBatalha = await http.get(
+        Uri.parse("$_baseUrl/convite/pendentes/$email"),
+      );
+      if (mounted && resBatalha.statusCode == 200) {
+        final data = jsonDecode(resBatalha.body);
+        total += (data["convites"] as List).length;
+      }
       if (mounted) {
         setState(() {
-          carregando = false;
+          _totalConvites = total;
         });
       }
+    } catch (e) {
+      print("Erro ao carregar contagem de convites: $e");
+      if (mounted)
+        setState(() {
+          _totalConvites = 0;
+        });
     }
   }
 
-  // Função de logout
+  // --- (Função _carregarContagemAmigos - sem alterações) ---
+  Future<void> _carregarContagemAmigos(String email) async {
+    try {
+      final res = await http.get(Uri.parse("$_baseUrl/amigos/listar/$email"));
+      if (mounted && res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (mounted) {
+          setState(() {
+            _amigosCount = (data["amigos"] as List).length;
+          });
+        }
+      }
+    } catch (e) {
+      print("Erro ao contar amigos: $e");
+      if (mounted)
+        setState(() {
+          _amigosCount = 0;
+        });
+    }
+  }
+
+  // --- (Função logout - sem alterações) ---
   void logout() async {
+    //... (seu código de logout)
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 
@@ -88,56 +131,90 @@ class _PerfilPageState extends State<PerfilPage> {
 
   @override
   Widget build(BuildContext context) {
-    // --- Lógica de Cálculo de Progresso e Formatação de Data ---
-    // Inicializa as variáveis com valores padrão
-    String progressoFases = "0/0";
+    // 🚀 LÊ O PROVIDER E SE REGISTRA PARA MUDANÇAS
+    final userProvider = context.watch<UserProvider>();
+
+    // --- (Lógica de Cálculo de Data) ---
+    // 🚀 LÊ A DATA DO PROVIDER
     String dataFormatada = "-";
-
-    // Só calcula se o usuário não for nulo
-    if (usuario != null) {
-      // Lógica de progresso
-      const String moduloPadrao = "Variáveis";
-      Map<String, dynamic> fasesMap;
-
-      if (usuario!["fases"] is Map) {
-        fasesMap = Map<String, dynamic>.from(usuario!["fases"] ?? {});
-      } else {
-        // Fallback para caso o backend ainda envie uma lista
-        fasesMap = {moduloPadrao: List.from(usuario!["fases"] ?? [])};
-      }
-
-      final List fasesDoModulo = List<Map<String, dynamic>>.from(
-        fasesMap[moduloPadrao] ?? [],
-      );
-
-      final int liberadas = fasesDoModulo
-          .where((f) => f["liberada"] == true)
-          .length;
-      final int total = fasesDoModulo.length;
-      progressoFases = total > 0 ? "$liberadas/$total" : "0/0";
-
-      // Lógica de formatação de data
-      final String? dataNascDB = usuario!["data_nascimento"];
-      if (dataNascDB != null) {
-        try {
-          // Converte "YYYY-MM-DD" para "DD/MM/YYYY"
-          final data = DateTime.parse(dataNascDB);
-          dataFormatada = DateFormat('dd/MM/yyyy').format(data);
-        } catch (e) {
-          dataFormatada = dataNascDB; // Mostra a data "crua" se der erro
-        }
+    final String? dataNascDB = userProvider.dataNascimento;
+    if (dataNascDB != null && dataNascDB != "-") {
+      try {
+        final data = DateTime.parse(dataNascDB);
+        dataFormatada = DateFormat('dd/MM/yyyy').format(data);
+      } catch (e) {
+        dataFormatada = dataNascDB;
       }
     }
     // --- Fim da lógica de cálculo ---
 
+    // 🚀 CRIA UM MAPA TEMPORÁRIO PARA PASSAR PARA A 'EditarPerfilPage'
+    // (O ideal seria refatorar 'EditarPerfilPage' para também usar o provider)
+    final Map<String, dynamic> usuarioMapParaEdicao = {
+      "nome": userProvider.nome,
+      "email": userProvider.email,
+      "data_nascimento": userProvider.dataNascimento,
+      "telefone": userProvider.telefone,
+      "nivel": userProvider.nivel,
+      "rank_score": userProvider.rank,
+      "moedas": userProvider.moedas,
+      "streak": userProvider.streak,
+    };
+
     return Scaffold(
-      extendBodyBehindAppBar: true, // Permite o gradiente ficar atrás da AppBar
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text("Perfil", style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.transparent, // AppBar transparente
-        elevation: 0, // Sem sombra
-        foregroundColor: Colors.white, // Cor dos ícones (como a seta "voltar")
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: Colors.white,
         actions: [
+          // Ícone de Convites (Carta)
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.mail_outline,
+                  color: Colors.white,
+                  size: 28,
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ConvitesPage()),
+                  ).then((_) => carregarContadores()); // Recarrega contadores
+                },
+              ),
+              if (_totalConvites > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '$_totalConvites',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+
+          // Ícone de Configurações
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.white),
             onPressed: () {
@@ -150,7 +227,7 @@ class _PerfilPageState extends State<PerfilPage> {
         ],
       ),
       body: Container(
-        // Fundo gradiente (o mesmo do login/cadastro)
+        // (Fundo Gradiente)
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
@@ -167,17 +244,10 @@ class _PerfilPageState extends State<PerfilPage> {
         ),
         child: SafeArea(
           child: Center(
-            // Mostra indicador de loading
-            child: carregando
+            // 🚀 USA O 'isLoading' DO PROVIDER
+            child: userProvider.isLoading
                 ? const CircularProgressIndicator(color: Color(0xFF3CB371))
-                // Mostra erro se o usuário for nulo após o loading
-                : usuario == null
-                ? const Text(
-                    "Erro ao carregar perfil.\nTente novamente mais tarde.",
-                    style: TextStyle(color: Colors.black87, fontSize: 16),
-                    textAlign: TextAlign.center,
-                  )
-                // Mostra o conteúdo da página
+                // 🚀 REMOVE A CHECAGEM 'usuario == null'
                 : SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 24.0,
@@ -185,7 +255,7 @@ class _PerfilPageState extends State<PerfilPage> {
                     ),
                     child: Column(
                       children: [
-                        // 🔹 Avatar
+                        // (Avatar)
                         CircleAvatar(
                           radius: 50,
                           backgroundColor: const Color(0xFF3CB371),
@@ -197,27 +267,24 @@ class _PerfilPageState extends State<PerfilPage> {
                         ),
                         const SizedBox(height: 12),
 
-                        // 🔹 Nome e Botão de Editar
+                        // (Nome e Botão Editar)
                         Center(
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min, // Encolhe a Row
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Flexible(
-                                // Para nomes grandes
                                 child: Text(
-                                  usuario!["nome"] ?? "Usuário",
+                                  // 🚀 LÊ DO PROVIDER
+                                  userProvider.nome,
                                   style: const TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.bold,
                                     color: Color(0xFF2E2E2E),
                                   ),
-                                  textAlign: TextAlign.center,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              // 🔹 BOTÃO DE EDITAR
                               IconButton(
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
@@ -227,29 +294,72 @@ class _PerfilPageState extends State<PerfilPage> {
                                   size: 24,
                                 ),
                                 onPressed: () async {
-                                  // 1. Navega para a tela de edição
                                   final bool? atualizou = await Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) =>
-                                          EditarPerfilPage(usuario: usuario!),
+                                      builder: (_) => EditarPerfilPage(
+                                        // 🚀 PASSA O MAPA CRIADO
+                                        usuario: usuarioMapParaEdicao,
+                                      ),
                                     ),
                                   );
-
-                                  // 2. Se a tela de edição retornar 'true',
-                                  // recarrega os dados do usuário.
                                   if (atualizou == true && mounted) {
-                                    carregarUsuario();
+                                    // 🚀 AVISA O PROVIDER PARA RECARREGAR
+                                    Provider.of<UserProvider>(
+                                      context,
+                                      listen: false,
+                                    ).loadUserData(userProvider.email);
+                                    // Recarrega os contadores locais
+                                    carregarContadores();
                                   }
                                 },
                               ),
                             ],
                           ),
                         ),
-                        // Email
+                        // (Email)
                         Text(
-                          usuario!["email"] ?? "",
+                          // 🚀 LÊ DO PROVIDER
+                          userProvider.email,
                           style: const TextStyle(color: Colors.black54),
+                        ),
+
+                        // (Botão Adicionar Amigos)
+                        const SizedBox(height: 10),
+                        ElevatedButton.icon(
+                          icon: const Icon(
+                            Icons.person_add_outlined,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          label: const Text(
+                            "Adicionar Amigos",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF3CB371),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 3,
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AmigosAdicionarHubPage(),
+                              ),
+                            );
+                          },
                         ),
 
                         const SizedBox(height: 30),
@@ -258,47 +368,80 @@ class _PerfilPageState extends State<PerfilPage> {
                         _buildModernCard(
                           Column(
                             children: [
-                              // Estatísticas (Nível, Sequência, Fases)
+                              // 👇 ================ STATS ATUALIZADAS ================ 👇
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceEvenly,
                                 children: [
                                   _statCard(
                                     "Nível",
-                                    usuario!["nivel"] ?? "iniciante",
+                                    // 🚀 LÊ DO PROVIDER
+                                    userProvider.nivel,
                                     Icons.school,
                                   ),
                                   _statCard(
                                     "Sequência",
-                                    "${usuario!["streak"] ?? 0}",
+                                    // 🚀 LÊ DO PROVIDER
+                                    "${userProvider.streak}",
                                     Icons.local_fire_department,
                                     color: Colors.orange,
                                   ),
-                                  _statCard(
-                                    "Fases",
-                                    progressoFases,
-                                    Icons.flag,
+                                  // --- BOTÃO DE AMIGOS CLICÁVEL (ATUALIZADO) ---
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const AmigosPage(),
+                                        ),
+                                      ).then(
+                                        (_) => carregarContadores(),
+                                      ); // Recarrega contadores
+                                    },
+                                    child: _statCard(
+                                      "Amigos",
+                                      "$_amigosCount", // <-- Usa o contador local
+                                      Icons.people_outline,
+                                      color: Colors.blue.shade700,
+                                    ),
                                   ),
+                                  // --- FIM DO BOTÃO DE AMIGOS ---
                                 ],
                               ),
+
+                              // 👆 =============================================== 👆
                               const SizedBox(height: 20),
                               const Divider(color: Colors.black12, height: 1),
                               const SizedBox(height: 20),
 
-                              // Informações ( Nascimento, etc.)
-                              _info("Nascimento", dataFormatada),
+                              // Informações
+                              _info(
+                                "Nascimento",
+                                dataFormatada,
+                              ), // <-- Usa a data formatada
                               _info(
                                 "Telefone",
-                                "${usuario!["telefone"] ?? "-"}",
+                                // 🚀 LÊ DO PROVIDER
+                                userProvider.telefone,
                               ),
-                              _info("Nível atual", usuario!["nivel"] ?? "-"),
+                              _info(
+                                "Nível atual",
+                                // 🚀 LÊ DO PROVIDER
+                                userProvider.nivel,
+                              ),
+                              const SizedBox(height: 6),
+                              _info(
+                                "Pontuação (Rank) 🏆",
+                                // 🚀 LÊ DO PROVIDER
+                                "${userProvider.rank}",
+                              ),
                             ],
                           ),
                         ),
 
                         const SizedBox(height: 40),
 
-                        // 🔹 Botão Sair
+                        // (Botão Sair)
                         ElevatedButton.icon(
                           onPressed: logout,
                           style: ElevatedButton.styleFrom(
@@ -324,19 +467,17 @@ class _PerfilPageState extends State<PerfilPage> {
     );
   }
 
-  // --- Widgets Auxiliares ---
-
-  // Constrói o card branco flutuante
+  // --- Widgets Auxiliares (Sem alterações) ---
   Widget _buildModernCard(Widget child) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.8), // Fundo branco semitransparente
+        color: Colors.white.withOpacity(0.8),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08), // Sombra suave
+            color: Colors.black.withOpacity(0.08),
             spreadRadius: 0,
             blurRadius: 15,
             offset: const Offset(0, 8),
@@ -347,12 +488,11 @@ class _PerfilPageState extends State<PerfilPage> {
     );
   }
 
-  // Constrói cada item de estatística (Nível, Sequência, Fases)
   Widget _statCard(
     String label,
     String value,
     IconData icon, {
-    Color color = const Color(0xFF3CB371), // Cor verde padrão
+    Color color = const Color(0xFF3CB371),
   }) {
     return Column(
       children: [
@@ -374,7 +514,6 @@ class _PerfilPageState extends State<PerfilPage> {
     );
   }
 
-  // Constrói cada linha de informação (Idade, Telefone, etc.)
   Widget _info(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),

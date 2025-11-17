@@ -1,16 +1,21 @@
-// Arquivo: PaginaHome.dart
-
-// ⚠️ CORREÇÃO: Sintaxe correta dos imports de pacotes.
+// Arquivo: PaginaHome.dart (CORRIGIDO com 4º ícone no BottomBar)
 
 import 'dart:convert';
-import 'package:flutter/material.dart'; // CORREÇÃO
-import 'package:http/http.dart' as http; // CORREÇÃO
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import 'package:codepath/providers/user_provider.dart';
 
 // Imports dos arquivos locais
 import 'trilhaUm.dart';
 import 'perfil.dart';
 import 'tela_configuracao.dart';
+import 'amigos_page.dart';
+import 'batalha_page.dart';
+import 'resultado_dialog.dart';
+import 'convites_page.dart';
+import 'leaderboard_page.dart'; // 🚀 IMPORTA A TELA DO PLACAR
 
 class PaginaHome extends StatefulWidget {
   const PaginaHome({super.key});
@@ -21,15 +26,19 @@ class PaginaHome extends StatefulWidget {
 
 class _PaginaHomeState extends State<PaginaHome> {
   List<String> modulos = [];
-  bool carregando = true;
-  int streak = 0;
-  String nomeUsuario = "Usuário";
+  bool carregandoModulos = true;
   int _selectedIndex = 0;
 
   late PageController _pageController;
-
   double _currentPage = 0.0;
 
+  String _userEmail = "";
+  int _totalConvites = 0;
+  final String _baseUrl = "https://projeto-codepath.onrender.com";
+
+  bool _isUserDataLoading = false;
+
+  // --- (Mapas de Metadados) ---
   final Map<String, String> _cardDisplayNames = {
     "Variáveis e Tipos de Dados": "Variáveis",
     "Laços de Repetição": "Laços",
@@ -37,7 +46,6 @@ class _PaginaHomeState extends State<PaginaHome> {
     "Funções": "Funções",
     "Perguntas diversas": "Diversos",
   };
-
   final Map<String, String> _appBarTitles = {
     "Variáveis e Tipos de Dados": "Variáveis e\nTipos de Dados",
     "Laços de Repetição": "Laços de\nRepetição",
@@ -45,31 +53,31 @@ class _PaginaHomeState extends State<PaginaHome> {
     "Funções": "Funções",
     "Perguntas diversas": "Perguntas\nDiversas",
   };
-
   final Map<String, Map<String, dynamic>> _moduloMetadata = {
+    // ... (Seu mapa _moduloMetadata completo aqui, sem alterações) ...
     "Laços de Repetição": {
       "animal": "assets/imagens/Papagaio.png",
       "gradient": [const Color(0xFF4C7516), const Color(0xFF8EDB29)],
       "backgroundAsset": "assets/fundos_trilhas/fundo_papagaio.png",
       "posicoes": [
-        const Offset(0.53, 0.33), // 1º
-        const Offset(0.37, 0.42), // 2º
-        const Offset(0.46, 0.54), // 3º
-        const Offset(0.51, 0.66), // 4º
-        const Offset(0.60, 0.79), // 5º
-        const Offset(0.34, 0.83), // 6º
+        const Offset(0.53, 0.33),
+        const Offset(0.37, 0.42),
+        const Offset(0.46, 0.54),
+        const Offset(0.51, 0.66),
+        const Offset(0.60, 0.79),
+        const Offset(0.34, 0.83),
       ],
     },
     "Condicionais": {
       "animal": "assets/imagens/Esquilo.png",
       "backgroundAsset": "assets/fundos_trilhas/fundo_esquilo.png",
       "posicoes": [
-        const Offset(0.53, 0.33), // 1º
-        const Offset(0.37, 0.42), // 2º
-        const Offset(0.46, 0.54), // 3º
-        const Offset(0.51, 0.67), // 4º
-        const Offset(0.60, 0.79), // 5º
-        const Offset(0.34, 0.83), // 6º
+        const Offset(0.53, 0.33),
+        const Offset(0.37, 0.42),
+        const Offset(0.46, 0.54),
+        const Offset(0.51, 0.67),
+        const Offset(0.60, 0.79),
+        const Offset(0.34, 0.83),
       ],
       "gradient": [const Color(0xFF8D6E63), const Color(0xFFA1887F)],
     },
@@ -84,12 +92,12 @@ class _PaginaHomeState extends State<PaginaHome> {
       "stops": [0.0, 0.29, 0.46, 0.86],
       "backgroundAsset": "assets/fundos_trilhas/fundo_canguru.png",
       "posicoes": [
-        const Offset(0.55, 0.33), // 1º
-        const Offset(0.399, 0.43), // 2º
-        const Offset(0.489, 0.55), // 3º
-        const Offset(0.533, 0.67), // 4º
-        const Offset(0.63, 0.79), // 5º
-        const Offset(0.34, 0.85), // 6º
+        const Offset(0.55, 0.33),
+        const Offset(0.399, 0.43),
+        const Offset(0.489, 0.55),
+        const Offset(0.533, 0.67),
+        const Offset(0.63, 0.79),
+        const Offset(0.34, 0.85),
       ],
     },
     "Funções": {
@@ -103,12 +111,12 @@ class _PaginaHomeState extends State<PaginaHome> {
       "stops": [0.07, 0.38, 0.58, 0.87],
       "backgroundAsset": "assets/fundos_trilhas/fundo_abelha.png",
       "posicoes": [
-        const Offset(0.55, 0.32), // 1º
-        const Offset(0.389, 0.41), // 2º
-        const Offset(0.48, 0.53), // 3º
-        const Offset(0.53, 0.66), // 4º
-        const Offset(0.62, 0.78), // 5º
-        const Offset(0.34, 0.83), // 6º
+        const Offset(0.55, 0.32),
+        const Offset(0.389, 0.41),
+        const Offset(0.48, 0.53),
+        const Offset(0.53, 0.66),
+        const Offset(0.62, 0.78),
+        const Offset(0.34, 0.83),
       ],
     },
     "Perguntas diversas": {
@@ -116,16 +124,15 @@ class _PaginaHomeState extends State<PaginaHome> {
       "gradient": [const Color(0xFF616161), const Color(0xFF424242)],
       "backgroundAsset": "assets/fundos_trilhas/fundo_cachorro.png",
       "posicoes": [
-        const Offset(0.53, 0.33), // 1º
-        const Offset(0.37, 0.42), // 2º
-        const Offset(0.46, 0.54), // 3º
-        const Offset(0.51, 0.66), // 4º
-        const Offset(0.60, 0.79), // 5º
-        const Offset(0.34, 0.83), // 6º
+        const Offset(0.53, 0.33),
+        const Offset(0.37, 0.42),
+        const Offset(0.46, 0.54),
+        const Offset(0.51, 0.66),
+        const Offset(0.60, 0.79),
+        const Offset(0.34, 0.83),
       ],
     },
   };
-
   final Map<String, dynamic> _defaultInfo = {
     "animal": "assets/imagens/gato1.png",
     "gradient": [Colors.grey.shade600, Colors.grey.shade800],
@@ -137,6 +144,7 @@ class _PaginaHomeState extends State<PaginaHome> {
     ],
   };
 
+  // --- (Getters de Cor) ---
   Color get _startColor {
     if (modulos.isEmpty) return _defaultInfo["gradient"][0];
     final startModuloIndex = _currentPage.floor();
@@ -144,17 +152,13 @@ class _PaginaHomeState extends State<PaginaHome> {
       0,
       modulos.length - 1,
     );
-
     final startModulo = modulos[startModuloIndex];
     final startInfo = _moduloMetadata[startModulo] ?? _defaultInfo;
     final startColor = startInfo["gradient"][0] as Color;
-
     if (startModuloIndex == endModuloIndex) return startColor;
-
     final endModulo = modulos[endModuloIndex];
     final endInfo = _moduloMetadata[endModulo] ?? _defaultInfo;
     final endColor = endInfo["gradient"][0] as Color;
-
     final t = _currentPage - startModuloIndex;
     return Color.lerp(startColor, endColor, t) ?? startColor;
   }
@@ -166,17 +170,13 @@ class _PaginaHomeState extends State<PaginaHome> {
       0,
       modulos.length - 1,
     );
-
     final startModulo = modulos[startModuloIndex];
     final startInfo = _moduloMetadata[startModulo] ?? _defaultInfo;
     final startColor = startInfo["gradient"].last as Color;
-
     if (startModuloIndex == endModuloIndex) return startColor;
-
     final endModulo = modulos[endModuloIndex];
     final endInfo = _moduloMetadata[endModulo] ?? _defaultInfo;
     final endColor = endInfo["gradient"].last as Color;
-
     final t = _currentPage - startModuloIndex;
     return Color.lerp(startColor, endColor, t) ?? startColor;
   }
@@ -191,19 +191,29 @@ class _PaginaHomeState extends State<PaginaHome> {
     };
   }
 
+  // --- (initState, didChangeDependencies, dispose) ---
   @override
   void initState() {
     super.initState();
-
     _pageController = PageController(viewportFraction: 0.85);
     _pageController.addListener(() {
-      setState(() {
-        _currentPage = _pageController.page ?? 0.0;
-      });
+      if (mounted) {
+        setState(() {
+          _currentPage = _pageController.page ?? 0.0;
+        });
+      }
     });
 
     carregarModulos();
-    carregarUsuario();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isUserDataLoading) {
+      _isUserDataLoading = true;
+      carregarUsuarioEContadores();
+    }
   }
 
   @override
@@ -212,12 +222,11 @@ class _PaginaHomeState extends State<PaginaHome> {
     super.dispose();
   }
 
+  // --- (Funções de Carregamento) ---
   Future<void> carregarModulos() async {
     List<String> modulosDaApi = [];
     try {
-      final response = await http.get(
-        Uri.parse("https://projeto-codepath.onrender.com/modulos"),
-      );
+      final response = await http.get(Uri.parse("$_baseUrl/modulos"));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         modulosDaApi = List<String>.from(data["modulos"] ?? []);
@@ -227,9 +236,7 @@ class _PaginaHomeState extends State<PaginaHome> {
     } catch (e) {
       debugPrint("Erro de rede ao carregar módulos: $e");
     }
-
     List<String> modulosFinais;
-
     if (modulosDaApi.isNotEmpty &&
         modulosDaApi.length >= _moduloMetadata.length) {
       modulosFinais = modulosDaApi;
@@ -239,138 +246,74 @@ class _PaginaHomeState extends State<PaginaHome> {
         "Usando a lista de módulos local: ${modulosFinais.length} itens.",
       );
     }
-
-    setState(() {
-      modulos = modulosFinais;
-      carregando = false;
-    });
+    if (mounted) {
+      setState(() {
+        modulos = modulosFinais;
+        carregandoModulos = false;
+      });
+    }
   }
 
-  Future<void> carregarUsuario() async {
+  Future<void> carregarUsuarioEContadores() async {
+    if (!mounted) return;
+    setState(() {
+      _totalConvites = 0;
+    });
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final email = prefs.getString("userEmail");
+      _userEmail = email ?? "";
 
-      if (email == null || email.isEmpty) {
-        setState(() {
-          nomeUsuario = "Usuário"; // Garante o padrão se não houver login
-          streak = 0;
-        });
+      if (_userEmail.isEmpty) {
+        if (mounted) {
+          Provider.of<UserProvider>(context, listen: false).stopLoading();
+        }
         return;
       }
 
-      int maxTentativas = 3; // Vamos tentar buscar 3 vezes
-      int delayEmMs = 500; // Esperar meio segundo entre as tentativas
+      await Provider.of<UserProvider>(
+        context,
+        listen: false,
+      ).loadUserData(_userEmail);
 
-      for (int i = 0; i < maxTentativas; i++) {
-        // Tenta buscar o perfil
-        final response = await http.get(
-          Uri.parse("https://projeto-codepath.onrender.com/profile/$email"),
-        );
-
-        if (response.statusCode == 200) {
-          // 🚀 SUCESSO! Encontrou o perfil.
-          final data = jsonDecode(response.body);
-
-          setState(() {
-            streak = data["user"]["streak"] ?? 0;
-
-            String nomeCompleto = data["user"]["nome"] ?? "Usuário";
-
-            // Se o nome for o e-mail, extraímos a primeira parte
-            if (nomeCompleto.contains('@') && nomeCompleto == email) {
-              String nomeDoEmail = nomeCompleto.split('@')[0];
-
-              if (nomeDoEmail.isNotEmpty) {
-                // Capitaliza a primeira letra para exibir como "Pedro"
-                nomeCompleto =
-                    nomeDoEmail[0].toUpperCase() + nomeDoEmail.substring(1);
-              }
-            }
-            nomeUsuario = nomeCompleto;
-          });
-
-          return; // Para a função aqui, pois deu certo.
-        } else if (response.statusCode == 404) {
-          // ⚠️ FALHA (404): Perfil não encontrado.
-          debugPrint(
-            "Tentativa ${i + 1} de $maxTentativas: Perfil $email não encontrado (404).",
-          );
-
-          if (i == maxTentativas - 1) {
-            // Se foi a última tentativa, desiste e assume "Usuário"
-            debugPrint("Desistindo de buscar perfil. Assumindo 'Usuário'.");
-            setState(() {
-              nomeUsuario = "Usuário";
-              streak = 0;
-            });
-          } else {
-            // Se não foi a última, espera um pouco e o loop tentará de novo.
-            await Future.delayed(Duration(milliseconds: delayEmMs));
-          }
-        } else {
-          // Outro erro (500, 401, etc.)
-          debugPrint(
-            "Erro ao carregar perfil (Status ${response.statusCode}): ${response.body}",
-          );
-          setState(() {
-            nomeUsuario = "Usuário";
-            streak = 0;
-          });
-          return; // Desiste em outros erros.
-        }
+      if (mounted) {
+        _checarNotificacoes();
+        _carregarContagemConvites(_userEmail);
       }
     } catch (e) {
-      debugPrint("Erro de rede ao carregar usuário: $e");
-      // Se der erro de conexão, assume "Usuário"
+      debugPrint("Erro ao carregar usuário na PaginaHome: $e");
       if (mounted) {
-        setState(() {
-          nomeUsuario = "Usuário";
-          streak = 0;
-        });
+        Provider.of<UserProvider>(context, listen: false).stopLoading();
       }
     }
   }
 
-  // 🚀 CORREÇÃO: Adicionado feedback de erro (SnackBar) para falhas de API/Login
+  // --- (Função abrirTrilha) ---
   Future<void> abrirTrilha(String tipoModulo) async {
-    print("PaginaHome: Iniciando abrirTrilha para $tipoModulo");
+    if (carregandoModulos) return;
 
-    // Mostra o loading imediatamente APENAS SE MONTADO
-    if (mounted) {
-      setState(() {
-        carregando = true;
-      });
-    } else {
-      print(
-        "PaginaHome: abrirTrilha chamada mas widget não está montado (início). Saindo.",
-      );
-      return; // Sai se não estiver montado logo no início
-    }
+    setState(() {
+      carregandoModulos = true;
+    });
 
-    String? email; // Variável para guardar o email
-    List<Map<String, dynamic>> fasesParaTrilha = []; // Inicia vazia
-
+    String? email;
+    List<Map<String, dynamic>> fasesParaTrilha = [];
     try {
       final prefs = await SharedPreferences.getInstance();
       email = prefs.getString("userEmail");
-
-      // Verifica email
       if (email == null || email.isEmpty) {
         if (mounted) {
-          print("PaginaHome: Erro em abrirTrilha - Usuário não logado.");
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text("Erro: Usuário não logado."),
               backgroundColor: Colors.red,
             ),
           );
-          setState(() => carregando = false); // Esconde loading
+          setState(() => carregandoModulos = false);
         }
         return;
       }
-
-      // --- Preparação dos dados para TrilhaUm (sem alterações) ---
       final String nomeModuloAPI = _moduloNameMap[tipoModulo] ?? tipoModulo;
       final info = _moduloMetadata[tipoModulo] ?? _defaultInfo;
       final String backgroundAsset = info["backgroundAsset"] as String;
@@ -378,68 +321,40 @@ class _PaginaHomeState extends State<PaginaHome> {
       final animalAsset = info["animal"] as String;
       final List<Color> gradientColors = info["gradient"] as List<Color>;
       final appBarTitle = _appBarTitles[tipoModulo] ?? tipoModulo;
-      // --- Fim da preparação ---
 
-      print(
-        "PaginaHome: Buscando perfil para $email antes de navegar para TrilhaUm.",
-      );
-      // Busca o perfil para pegar as fases ATUAIS antes de navegar
-      final response = await http.get(
-        Uri.parse("https://projeto-codepath.onrender.com/profile/$email"),
-      );
+      final response = await http.get(Uri.parse("$_baseUrl/profile/$email"));
 
-      // Verifica se ainda está montado APÓS a chamada async
-      if (!mounted) {
-        print(
-          "PaginaHome: Widget desmontado após buscar perfil. Saindo de abrirTrilha.",
-        );
-        return;
-      }
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final user = data["user"] ?? data;
         final dynamic fasesData = user["fases"];
         Map<String, dynamic> fasesMap;
-
-        // Lógica para lidar com Map ou List vindo do backend (sem alterações)
         if (fasesData is Map) {
           fasesMap = Map<String, dynamic>.from(fasesData);
         } else {
           fasesMap = {};
         }
-
         fasesParaTrilha = List<Map<String, dynamic>>.from(
           fasesMap[nomeModuloAPI] ?? [],
         );
-
-        // Inicializa fases se necessário (sem alterações)
         if (fasesParaTrilha.isEmpty) {
-          print(
-            "PaginaHome: Inicializando fases localmente para $nomeModuloAPI",
-          );
           fasesParaTrilha = List.generate(
             5,
             (i) => {"id": i + 1, "liberada": i == 0, "atual": i == 0},
           );
-          // Considerar salvar no backend aqui se a lógica exigir
         }
-        print(
-          "PaginaHome: Fases carregadas/inicializadas para $nomeModuloAPI. Fases: $fasesParaTrilha",
-        );
 
-        // Esconde o loading ANTES de navegar
-        setState(() => carregando = false);
+        setState(() => carregandoModulos = false);
 
-        print("PaginaHome: Navegando para TrilhaUm...");
-        // Navega para a TrilhaUm e ESPERA ela fechar
         await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => TrilhaUm(
               tipoModulo: appBarTitle,
               tipoModuloAPI: nomeModuloAPI,
-              fases: fasesParaTrilha, // Passa as fases corretas
+              fases: fasesParaTrilha,
               backgroundAsset: backgroundAsset,
               posicoes: posicoes,
               animalAsset: animalAsset,
@@ -447,41 +362,13 @@ class _PaginaHomeState extends State<PaginaHome> {
             ),
           ),
         );
-        // --- CÓDIGO EXECUTADO AO VOLTAR DA TrilhaUm ---
 
-        print("PaginaHome: Voltou da TrilhaUm para $tipoModulo.");
-        // Verifica se AINDA está montado DEPOIS de voltar
         if (mounted) {
-          print(
-            "PaginaHome: Widget ainda montado. Recarregando dados do usuário...",
-          );
-          // Força o recarregamento dos dados do usuário (streak pode ter mudado)
-          // Mostra loading de novo para indicar recarga
-          setState(() => carregando = true);
-          await carregarUsuario(); // Espera carregar os dados
-          // Se precisar recarregar módulos (improvável aqui):
-          // await carregarModulos();
-          print("PaginaHome: Dados do usuário recarregados.");
-          // Esconde loading APÓS recarregar, mas apenas se ainda montado
-          if (mounted) {
-            setState(() => carregando = false);
-            print("PaginaHome: Loading escondido após recarga.");
-          } else {
-            print(
-              "PaginaHome: Widget desmontado DEPOIS de recarregar usuário. Não escondendo loading.",
-            );
-          }
-        } else {
-          print(
-            "PaginaHome: Widget desmontado AO VOLTAR da TrilhaUm. Não recarregando.",
-          );
+          setState(() => carregandoModulos = true);
+          await carregarUsuarioEContadores();
+          await carregarModulos();
         }
-        // --- FIM DO CÓDIGO AO VOLTAR ---
       } else {
-        // Erro ao buscar perfil
-        print(
-          "PaginaHome: Erro ${response.statusCode} ao buscar perfil em abrirTrilha.",
-        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -491,13 +378,12 @@ class _PaginaHomeState extends State<PaginaHome> {
               backgroundColor: Colors.orange,
             ),
           );
-          setState(() => carregando = false); // Esconde loading
+          setState(() => carregandoModulos = false);
         }
       }
     } catch (e, stacktrace) {
-      // Captura stacktrace para mais detalhes
       print("PaginaHome: EXCEÇÃO GERAL em abrirTrilha: $e");
-      print(stacktrace); // Imprime o stacktrace
+      print(stacktrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -505,110 +391,353 @@ class _PaginaHomeState extends State<PaginaHome> {
             backgroundColor: Colors.red,
           ),
         );
-        setState(() => carregando = false); // Esconde loading
+        setState(() => carregandoModulos = false);
       }
     } finally {
-      // Garante que o loading saia em caso de erro não pego ou desmontado
-      // Se o widget ainda estiver montado E o loading estiver ativo, desativa.
-      if (mounted && carregando) {
-        print("PaginaHome: Finally: Garantindo que o loading saia.");
-        setState(() => carregando = false);
-      } else if (!mounted) {
-        print("PaginaHome: Finally: Widget desmontado, loading=$carregando.");
+      if (mounted && carregandoModulos) {
+        setState(() => carregandoModulos = false);
       }
-      print("PaginaHome: Fim de abrirTrilha para $tipoModulo");
     }
   }
 
-  // 👇 NOVA FUNÇÃO PARA O BOTÃO DE BATALHA 👇
+  // --- (Lógica de Batalha) ---
   Future<void> _iniciarBatalha() async {
-    // 1. Descobrir contra quem o usuário quer jogar
-    //    (Por enquanto, vamos simular que ele desafiou "oponente@email.com")
-    //    No futuro, aqui você abriria um modal para o usuário digitar o email de um amigo.
+    if (!mounted) return;
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
 
-    // 2. Pegar o email do jogador atual
-    final prefs = await SharedPreferences.getInstance();
-    final emailJogador = prefs.getString("userEmail");
-    final nivelJogador = prefs.getString("userNivel") ?? "iniciante";
+    final emailJogador = _userEmail;
+    final nivelJogador = userProvider.nivel;
 
-    if (emailJogador == null) {
+    if (emailJogador.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Você precisa estar logado para batalhar!"),
+          backgroundColor: Colors.red,
         ),
       );
       return;
     }
-
-    // AQUI VEM A LÓGICA DE CRIAR A PARTIDA NO BACKEND
-    // (Vamos deixar isso comentado por enquanto,
-    //  pois primeiro precisamos criar a tela de batalha)
-
-    print("TODO: Abrir a nova tela de batalha (desafio_page.dart)");
-
-    /* // FLUXO FUTURO:
-    
-    // 1. Chamar o backend para criar o desafio
-    final response = await http.post(
-      Uri.parse("https://projeto-codepath.onrender.com/desafio/criar"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "email_desafiante": emailJogador,
-        "email_desafiado": "amigo@email.com", // Email do oponente
-        "nivel": nivelJogador
-      })
-    );
-    
-    // 2. Se deu certo, pegar os dados do desafio (ID, Pergunta, Opções)
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final idDesafio = data["id_desafio"];
-      
-      // 3. Navegar para a NOVA tela de batalha
-      Navigator.push(context, MaterialPageRoute(
-        builder: (_) => DesafioPage( // A nova tela que vamos criar
-           idDesafio: idDesafio,
-           // Passar os dados da pergunta que o backend enviou
-        )
-      ));
-    }
-    */
+    _showModoBatalhaPopup(context, emailJogador, nivelJogador);
   }
-  // 👆 FIM DA NOVA FUNÇÃO 👆
 
+  void _showModoBatalhaPopup(
+    BuildContext context,
+    String emailJogador,
+    String nivelJogador,
+  ) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            "Arena de Batalha",
+            textAlign: TextAlign.center,
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: const Text("Como você quer desafiar?"),
+          actionsAlignment: MainAxisAlignment.center,
+          actionsPadding: const EdgeInsets.only(
+            bottom: 20,
+            left: 20,
+            right: 20,
+          ),
+          actions: [
+            Column(
+              children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.public, color: Colors.white),
+                  label: const Text(
+                    "Batalha Aleatória",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _navegarParaBatalhaAleatoria(emailJogador, nivelJogador);
+                  },
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.people, color: Colors.white),
+                  label: const Text(
+                    "Desafiar Amigo",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade700,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _navegarParaAmigos(context);
+                  },
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _navegarParaBatalhaAleatoria(String email, String nivel) async {
+    setState(() => carregandoModulos = true);
+
+    try {
+      final response = await http.post(
+        Uri.parse("$_baseUrl/batalha/iniciar"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email, "nivel": nivel}),
+      );
+      if (!mounted) return;
+      setState(() => carregandoModulos = false);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> perguntas = data['perguntas'] ?? [];
+        final List<Map<String, dynamic>> listaPerguntas =
+            List<Map<String, dynamic>>.from(perguntas);
+
+        if (listaPerguntas.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                "Nenhuma pergunta de batalha encontrada para seu nível.",
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BatalhaPage(
+              perguntas: listaPerguntas,
+              tipoBatalha: "ALEATORIA",
+              idBatalhaOponente: data['id_batalha_oponente'],
+              pontuacaoOponente: data['pontuacao_oponente'] != null
+                  ? (data['pontuacao_oponente'] as num).toInt()
+                  : null,
+              idConvite: null,
+            ),
+          ),
+        );
+      } else {
+        final data = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "Erro ao iniciar batalha: ${data['detail'] ?? response.body}",
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) setState(() => carregandoModulos = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Erro de conexão: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _navegarParaAmigos(BuildContext context) {
+    print("Navegando para a Central de Amigos...");
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AmigosPage()),
+    );
+  }
+
+  // --- (Funções de Notificação) ---
+  Future<void> _carregarContagemConvites(String email) async {
+    int total = 0;
+    try {
+      final resAmigos = await http.get(
+        Uri.parse("$_baseUrl/amigos/pedidos_pendentes/$email"),
+      );
+      if (mounted && resAmigos.statusCode == 200) {
+        final data = jsonDecode(resAmigos.body);
+        total += (data["pedidos"] as List).length;
+      }
+      final resBatalha = await http.get(
+        Uri.parse("$_baseUrl/convite/pendentes/$email"),
+      );
+      if (mounted && resBatalha.statusCode == 200) {
+        final data = jsonDecode(resBatalha.body);
+        total += (data["convites"] as List).length;
+      }
+      if (mounted) {
+        setState(() {
+          _totalConvites = total;
+        });
+      }
+    } catch (e) {
+      print("Erro ao carregar contagem de convites: $e");
+      if (mounted)
+        setState(() {
+          _totalConvites = 0;
+        });
+    }
+  }
+
+  Future<void> _checarNotificacoes() async {
+    if (_userEmail.isEmpty) return;
+    if (!mounted) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse("$_baseUrl/notificacoes/pendentes/$_userEmail"),
+      );
+
+      if (!mounted || response.statusCode != 200) return;
+
+      final data = jsonDecode(response.body) as List;
+      final List<Map<String, dynamic>> notificacoes = List.from(data);
+
+      if (notificacoes.isEmpty) {
+        print("Nenhuma notificação pendente.");
+        return;
+      }
+
+      for (var notif in notificacoes) {
+        final String status = notif['titulo']?.toUpperCase() ?? "RESULTADO";
+        final String mensagem = notif['mensagem'] ?? "Batalha finalizada";
+        final int rankChange = (notif['rank_change'] as num? ?? 0).toInt();
+        final int moedasGanhas = (notif['moedas_ganhas'] as num? ?? 0).toInt();
+        final String notificacaoId = notif['id'];
+
+        if (!mounted) return;
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => ResultadoFinalDialog(
+            status: status,
+            mensagem: mensagem,
+            rankChange: rankChange,
+            moedasGanhas: moedasGanhas,
+            onClose: () {
+              Navigator.pop(ctx);
+              _marcarNotificacaoComoLida(notificacaoId);
+
+              if (mounted) {
+                Provider.of<UserProvider>(
+                  context,
+                  listen: false,
+                ).applyBattleRewards(rankChange, moedasGanhas);
+              }
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      print("Erro ao checar notificações: $e");
+    }
+  }
+
+  Future<void> _marcarNotificacaoComoLida(String notificacaoId) async {
+    try {
+      await http.post(
+        Uri.parse("$_baseUrl/notificacoes/marcar_como_lido"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"notificacao_id": notificacaoId}),
+      );
+      print("Notificação $notificacaoId marcada como lida.");
+    } catch (e) {
+      print("Erro ao marcar notificação como lida: $e");
+    }
+  }
+
+  // --- 🚀 FUNÇÃO _onItemTapped ATUALIZADA PARA 4 BOTÕES 🚀 ---
   void _onItemTapped(int index) async {
-    setState(() => _selectedIndex = index);
+    // 1. Se o usuário clicar no ícone que JÁ ESTÁ ATIVO (Home), não faz nada
+    if (index == _selectedIndex && index == 0) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString("userEmail");
-
+    // 2. Se o usuário clicar em "Home" (index 0)
     if (index == 0) {
-      // Permanece na home
-    } else if (index == 1) {
-      // Botão Continuar
+      setState(() => _selectedIndex = 0);
+      return;
+    }
+
+    // 3. Se clicar em "Continuar" (index 1)
+    if (index == 1) {
+      setState(() => _selectedIndex = 1); // Destaca o botão "Play"
       if (modulos.isNotEmpty) {
         final moduloIndex = _currentPage.round().clamp(0, modulos.length - 1);
-        abrirTrilha(modulos[moduloIndex]);
+        await abrirTrilha(modulos[moduloIndex]);
       }
-    } else if (index == 2) {
-      // Botão Perfil
+      // QUANDO VOLTAR DA TRILHA, MARCA "HOME" (index 0) COMO ATIVO
+      if (mounted) {
+        setState(() => _selectedIndex = 0);
+      }
+      return;
+    }
+
+    // 4. Se clicar em "Perfil" (index 2)
+    if (index == 2) {
+      setState(() => _selectedIndex = 2); // Destaca o botão "Perfil"
+      final prefs = await SharedPreferences.getInstance();
+      final email = prefs.getString("userEmail");
+
       if (email != null) {
-        // Verifica se o 'context' é válido antes de navegar
         if (!mounted) return;
         await Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const PerfilPage()),
         );
-        carregarUsuario(); // Recarrega o usuário ao voltar do perfil
+        await carregarUsuarioEContadores();
       }
-      // Voltando para a Home visualmente
-      setState(() => _selectedIndex = 0);
+      // QUANDO VOLTAR DO PERFIL, MARCA "HOME" (index 0) COMO ATIVO
+      if (mounted) {
+        setState(() => _selectedIndex = 0);
+      }
+      return;
+    }
+
+    // 🚀 5. SE CLICAR NO NOVO BOTÃO "PLACAR" (index 3)
+    if (index == 3) {
+      setState(() => _selectedIndex = 3); // Destaca o botão "Placar"
+
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const LeaderboardPage()),
+      );
+      // QUANDO VOLTAR DO PLACAR, MARCA "HOME" (index 0) COMO ATIVO
+      if (mounted) {
+        setState(() => _selectedIndex = 0);
+      }
+      return;
     }
   }
+  // --- 👆 FIM DA CORREÇÃO 👆 ---
 
+  // --- (Build) ---
   @override
   Widget build(BuildContext context) {
+    final userProvider = context.watch<UserProvider>();
+
+    bool isLoading =
+        carregandoModulos || (userProvider.isLoading && modulos.isEmpty);
+
     return Scaffold(
       body: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
@@ -619,11 +748,10 @@ class _PaginaHomeState extends State<PaginaHome> {
             colors: [_startColor.withOpacity(0.9), Colors.white],
           ),
         ),
-        child: carregando
+        child: isLoading
             ? const Center(
                 child: CircularProgressIndicator(color: Colors.white),
               )
-            // Usa ListView para permitir rolagem e resolver overflows
             : ListView(
                 padding: EdgeInsets.zero,
                 children: [
@@ -640,10 +768,9 @@ class _PaginaHomeState extends State<PaginaHome> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // Envolve o Text em Expanded para corrigir overflow lateral
                             Expanded(
                               child: Text(
-                                "Olá, $nomeUsuario",
+                                "Olá, ${userProvider.nome}",
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -661,9 +788,42 @@ class _PaginaHomeState extends State<PaginaHome> {
                               ),
                             ),
 
+                            // === Row de Ícones (COM MOEDAS) ===
                             Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                // Streak
+                                // (Moedas)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.white54),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.monetization_on,
+                                        color: Colors.amber,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        "${userProvider.moedas}",
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+
+                                // (Streak)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 10,
@@ -683,7 +843,7 @@ class _PaginaHomeState extends State<PaginaHome> {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        "$streak",
+                                        "${userProvider.streak}",
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
@@ -693,7 +853,60 @@ class _PaginaHomeState extends State<PaginaHome> {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                // Configurações
+
+                                // (Ícone de Notificações)
+                                Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.mail_outline,
+                                        color: Colors.white,
+                                        size: 28,
+                                      ),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const ConvitesPage(),
+                                          ),
+                                        ).then(
+                                          (_) => carregarUsuarioEContadores(),
+                                        );
+                                      },
+                                    ),
+                                    if (_totalConvites > 0)
+                                      Positioned(
+                                        right: 8,
+                                        top: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red,
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                          constraints: const BoxConstraints(
+                                            minWidth: 16,
+                                            minHeight: 16,
+                                          ),
+                                          child: Text(
+                                            '$_totalConvites',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+
+                                // (Configurações)
                                 IconButton(
                                   icon: const Icon(
                                     Icons.settings,
@@ -708,13 +921,14 @@ class _PaginaHomeState extends State<PaginaHome> {
                                             const ConfiguracoesPage(),
                                       ),
                                     );
-                                    carregarUsuario();
+                                    _carregarContagemConvites(_userEmail);
                                   },
                                 ),
                               ],
                             ),
                           ],
                         ),
+
                         const SizedBox(height: 20),
                         const Text(
                           "Selecione sua trilha de aprendizado",
@@ -728,6 +942,7 @@ class _PaginaHomeState extends State<PaginaHome> {
                     ),
                   ),
 
+                  // --- (Resto do build - PageView, Batalha, etc.) ---
                   Column(
                     children: [
                       SizedBox(
@@ -763,13 +978,9 @@ class _PaginaHomeState extends State<PaginaHome> {
                                     animation: _pageController,
                                     builder: (context, child) {
                                       return Transform.scale(
-                                        scale: scale.clamp(
-                                          0.8,
-                                          1.0,
-                                        ), // Limita a escala
+                                        scale: scale.clamp(0.8, 1.0),
                                         child: GestureDetector(
                                           onTap: () => abrirTrilha(modulo),
-                                          // 🚀 CORREÇÃO DO CLIQUE:
                                           behavior: HitTestBehavior.opaque,
                                           child: Container(
                                             margin: const EdgeInsets.symmetric(
@@ -835,7 +1046,6 @@ class _PaginaHomeState extends State<PaginaHome> {
                                                     ],
                                                   ),
                                                 ),
-
                                                 Positioned(
                                                   bottom: -20,
                                                   right: -20,
@@ -845,7 +1055,6 @@ class _PaginaHomeState extends State<PaginaHome> {
                                                     fit: BoxFit.contain,
                                                   ),
                                                 ),
-
                                                 Positioned(
                                                   bottom: 20,
                                                   left: 20,
@@ -899,7 +1108,6 @@ class _PaginaHomeState extends State<PaginaHome> {
                                 },
                               ),
                       ),
-
                       const SizedBox(height: 10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -926,10 +1134,9 @@ class _PaginaHomeState extends State<PaginaHome> {
                           );
                         }),
                       ),
-
                       const SizedBox(height: 20),
 
-                      // Card "Desafios Semanais"
+                      // 🚀 CARD DO PLACAR DE LÍDERES FOI REMOVIDO DAQUI
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20.0),
                         child: Container(
@@ -985,7 +1192,6 @@ class _PaginaHomeState extends State<PaginaHome> {
                                   ],
                                 ),
                               ),
-
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 18,
@@ -1009,24 +1215,18 @@ class _PaginaHomeState extends State<PaginaHome> {
                           ),
                         ),
                       ),
-
-                      // 👇 NOVO BOTÃO DE BATALHA ADICIONADO AQUI 👇
-                      const SizedBox(height: 12), // Espaçamento
+                      const SizedBox(height: 12),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20.0),
                         child: InkWell(
-                          // InkWell para efeito de clique
-                          onTap: _iniciarBatalha, // Nova função
+                          onTap: _iniciarBatalha,
                           borderRadius: BorderRadius.circular(15),
                           child: Container(
                             height: 80,
                             padding: const EdgeInsets.all(16.0),
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFFD32F2F), // Vermelho Batalha
-                                  Color(0xFFB71C1C), // Vermelho Escuro
-                                ],
+                                colors: [Color(0xFFD32F2F), Color(0xFFB71C1C)],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
@@ -1042,8 +1242,7 @@ class _PaginaHomeState extends State<PaginaHome> {
                             child: Row(
                               children: [
                                 const Icon(
-                                  Icons
-                                      .bolt_rounded, // Ícone de "raio" ou "batalha"
+                                  Icons.bolt_rounded,
                                   color: Colors.white,
                                   size: 32,
                                 ),
@@ -1055,7 +1254,7 @@ class _PaginaHomeState extends State<PaginaHome> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: const [
                                       Text(
-                                        "Batalha x1 Rápida",
+                                        "Arena de Batalha",
                                         style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
@@ -1072,7 +1271,6 @@ class _PaginaHomeState extends State<PaginaHome> {
                                     ],
                                   ),
                                 ),
-                                // Seta para indicar ação
                                 const Icon(
                                   Icons.arrow_forward_ios,
                                   color: Colors.white70,
@@ -1083,17 +1281,13 @@ class _PaginaHomeState extends State<PaginaHome> {
                           ),
                         ),
                       ),
-                      // 👆 FIM DO NOVO BOTÃO DE BATALHA 👆
-
-                      // Adiciona um espaço no final da lista
                       const SizedBox(height: 20),
                     ],
                   ),
                 ],
               ),
       ),
-
-      // 🚀 CORREÇÃO: Adicionando o BottomNavigationBar que estava faltando
+      // --- 🚀 BARRA DE NAVEGAÇÃO ATUALIZADA 🚀 ---
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
@@ -1101,16 +1295,20 @@ class _PaginaHomeState extends State<PaginaHome> {
             label: 'Início',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.play_circle_fill, size: 36), // Ícone "Continuar"
+            icon: Icon(Icons.play_circle_fill, size: 36),
             label: 'Continuar',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
+          // 🚀 NOVO BOTÃO DO PLACAR DE LÍDERES
+          BottomNavigationBarItem(
+            icon: Icon(Icons.emoji_events_outlined), // Ícone de Troféu
+            label: 'Placar',
+          ),
         ],
         currentIndex: _selectedIndex,
-        // Usa a cor do gradiente atual para o ícone selecionado
         selectedItemColor: _startColor,
         unselectedItemColor: Colors.grey[600],
-        onTap: _onItemTapped, // Sua função de navegação
+        onTap: _onItemTapped,
         showSelectedLabels: false,
         showUnselectedLabels: false,
         type: BottomNavigationBarType.fixed,
