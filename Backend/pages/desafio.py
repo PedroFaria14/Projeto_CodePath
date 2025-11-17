@@ -1,4 +1,4 @@
-# Arquivo: pages/desafio.py (Com 3 Fases: Múltipla Escolha, Preencher Lacuna, Drag & Drop)
+# Arquivo: pages/desafio.py (Com 3 Fases e 3 TENTATIVAS SEMANAIS)
 
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
@@ -10,8 +10,9 @@ from typing import List, Dict, Any
 
 router = APIRouter()
 
-# --- Constantes do Desafio (ATUALIZADAS para 3, 4, 3) ---
+# --- Constantes do Desafio (ATUALIZADAS) ---
 MODULO_DA_SEMANA = "Condicionais" 
+LIMITE_TENTATIVAS_SEMANA = 3 # <-- NOVO LIMITE
 
 # NOVAS QUANTIDADES POR FASE
 QTD_FASE1_MULTIPLA_ESCOLHA = 3   # Múltipla Escolha
@@ -25,9 +26,9 @@ RECOMPENSA_MOEDAS = 150
 RECOMPENSA_RANK_VITORIA = 30
 RECOMPENSA_RANK_DERROTA = -5
 
-COLECAO_FASE1 = "batalhas_perguntas"      # Múltipla Escolha (usa a coleção original)
-COLECAO_FASE2 = "desafio_perguntas"       # Preencher Lacuna 
-COLECAO_FASE3 = "desafio_montar_codigo"   # COLEÇÃO NOVA para Drag & Drop
+COLECAO_FASE1 = "batalhas_perguntas"      # Múltipla Escolha E Preencher Lacuna
+COLECAO_FASE2 = "desafio_perguntas"       # (Não usada para buscar, mas definida)
+COLECAO_FASE3 = "desafio_montar_codigo"   # COLEÇÃO NOVA para Drag &Drop
 
 class DesafioRequest(BaseModel):
     email: str
@@ -74,11 +75,9 @@ async def atualizar_weekly_score(email: str, vitoria: bool):
 async def get_perguntas_fase1(modulo: str, count: int) -> List[Dict[str, Any]]:
     """ Busca 'count' perguntas de Múltipla Escolha (Fácil ou Difícil) na COLECAO_FASE1 """
     try:
-        # Busca perguntas que NÃO são do tipo codigo_snippet para a Fase 1
         query = db.collection(COLECAO_FASE1).where(
             filter=FieldFilter("modulo", "==", modulo)
         ).where(
-            # Garante que não pegamos o código snippet antigo que seria da fase 2
             filter=FieldFilter("tipo", "!=", "codigo_snippet") 
         )
         
@@ -92,7 +91,6 @@ async def get_perguntas_fase1(modulo: str, count: int) -> List[Dict[str, Any]]:
         if len(lista_perguntas) < count:
              print(f"AVISO: Pedido {count} perguntas Múltipla Escolha, mas só existem {len(lista_perguntas)}.")
             
-        # Pega aleatoriamente a quantidade necessária (Misturando Fácil e Difícil)
         return random.sample(lista_perguntas, num_a_pegar)
         
     except Exception as e:
@@ -105,14 +103,13 @@ async def get_perguntas_fase1(modulo: str, count: int) -> List[Dict[str, Any]]:
 @router.post("/desafio/iniciar", tags=["Desafio Semanal"])
 async def iniciar_desafio(payload: DesafioRequest):
     """
-    Verifica se o usuário já jogou e retorna as 10 perguntas em 3 Fases:
-    (3 Múltipla Escolha, 4 Preencher Lacuna, 3 Drag & Drop).
+    Verifica se o usuário já jogou (limite de 3 vezes) e retorna as 10 perguntas.
     """
     try:
         semana_atual = get_semana_atual()
         modulo_da_semana = MODULO_DA_SEMANA 
         
-        # 1. Verifica se o usuário já jogou (Lógica mantida)
+        # 1. Verifica se o usuário já jogou (LÓGICA ATUALIZADA)
         user_ref_query = db.collection("usuarios").where(filter=FieldFilter("email", "==", payload.email)).limit(1).get()
         if not user_ref_query:
             raise HTTPException(status_code=404, detail="Usuário não encontrado")
@@ -120,18 +117,34 @@ async def iniciar_desafio(payload: DesafioRequest):
         user_doc = user_ref_query[0]
         user_data = user_doc.to_dict()
         
-        semana_ultimo_desafio = user_data.get("semana_ultimo_desafio", 0)
-        
-        if semana_ultimo_desafio == semana_atual:
-            raise HTTPException(status_code=403, detail=f"Você já completou o desafio desta semana! O módulo é: {modulo_da_semana}.")
+        # --- INÍCIO DA NOVA LÓGICA DE TENTATIVAS ---
+        semana_registrada = user_data.get("desafio_week", 0)
+        plays_atuais = user_data.get("desafio_plays", 0)
 
-        # --- 2. Busca as perguntas nas 3 FASES EM ORDEM ---
+        # Se a semana registrada for diferente da atual, reseta o contador
+        if semana_registrada != semana_atual:
+            print(f"Nova semana detectada para {payload.email}. Resetando contador.")
+            user_doc.reference.update({
+                "desafio_week": semana_atual,
+                "desafio_plays": 0
+            })
+            plays_atuais = 0 # O usuário está agora na tentativa 0
+        
+        # Agora, verifica se ele já atingiu o limite esta semana
+        if plays_atuais >= LIMITE_TENTATIVAS_SEMANA:
+            raise HTTPException(status_code=403, detail=f"Você já usou suas {plays_atuais}/{LIMITE_TENTATIVAS_SEMANA} tentativas desta semana!")
+        
+        # Se chegou aqui, ele pode jogar.
+        print(f"Usuário {payload.email} iniciando tentativa {plays_atuais + 1} de {LIMITE_TENTATIVAS_SEMANA}.")
+        # --- FIM DA NOVA LÓGICA DE TENTATIVAS ---
+
+        # --- 2. Busca as perguntas nas 3 FASES EM ORDEM (Lógica anterior mantida e corrigida) ---
         
         # FASE 1: Múltipla Escolha (3 perguntas)
         perguntas_fase1 = await get_perguntas_fase1(modulo_da_semana, QTD_FASE1_MULTIPLA_ESCOLHA)
         
         # FASE 2: Preencher Lacuna (4 exercícios) - (Do tipo codigo_snippet)
-        query_fase2 = db.collection(COLECAO_FASE2).where(
+        query_fase2 = db.collection(COLECAO_FASE1).where( # Busca na COLECAO_FASE1
             filter=FieldFilter("modulo", "==", modulo_da_semana)
         ).where(
             filter=FieldFilter("tipo", "==", "codigo_snippet") # Garante que seja o formato de código
@@ -162,20 +175,21 @@ async def iniciar_desafio(payload: DesafioRequest):
             len(perguntas_fase3) < QTD_FASE3_DRAG_DROP):
             raise HTTPException(status_code=404, detail="Erro: Perguntas insuficientes para o desafio desta semana em alguma das fases.")
 
-        # 🚀 A MUDANÇA ESTÁ AQUI 🚀
-        # 3. Juntamos as listas EM ORDEM, e adicionamos a marcação da Fase para o Frontend
-        
-        # O ideal é que o 'tipo_interacao' (ou 'fase') seja definido no Banco. 
-        # Para que o Frontend saiba qual layout usar, vamos adicionar um campo 'fase' 
-        # antes de juntar as listas.
-        
+        # 3. Juntamos as listas EM ORDEM
         for p in perguntas_fase1: p['fase'] = 1
         for p in perguntas_fase2: p['fase'] = 2
         for p in perguntas_fase3: p['fase'] = 3
         
         todas_perguntas = perguntas_fase1 + perguntas_fase2 + perguntas_fase3
         
-        return {"success": True, "perguntas": todas_perguntas, "modulo": modulo_da_semana}
+        # Retorna a tentativa atual para o App (Opcional, mas útil)
+        return {
+            "success": True, 
+            "perguntas": todas_perguntas, 
+            "modulo": modulo_da_semana,
+            "tentativa_atual": plays_atuais + 1,
+            "tentativas_max": LIMITE_TENTATIVAS_SEMANA
+        }
 
     except HTTPException as http_exc:
         raise http_exc
@@ -187,7 +201,7 @@ async def iniciar_desafio(payload: DesafioRequest):
 @router.post("/desafio/finalizar", tags=["Desafio Semanal"])
 async def finalizar_desafio(payload: DesafioFinalizarRequest):
     """
-    Recebe a pontuação (de 10), calcula recompensas e marca o usuário.
+    Recebe a pontuação (de 10), calcula recompensas e INCREMENTA o contador.
     """
     try:
         semana_atual = get_semana_atual()
@@ -198,7 +212,7 @@ async def finalizar_desafio(payload: DesafioFinalizarRequest):
         
         user_doc = user_ref_query[0]
 
-        # 2. Calcula recompensas (Lógica mantida, ajustada para QTD_TOTAL=10)
+        # 2. Calcula recompensas (Lógica mantida)
         moedas_ganhas = 0
         rank_change = 0
         vitoria = False
@@ -211,11 +225,14 @@ async def finalizar_desafio(payload: DesafioFinalizarRequest):
         else:
             rank_change = RECOMPENSA_RANK_DERROTA
             
+        # Atualiza o placar de qualquer forma (vitória ou derrota)
         await atualizar_weekly_score(payload.email, vitoria=vitoria) 
 
-        # 3. Marca que o usuário completou o desafio (Lógica mantida)
+        # 3. ATUALIZAÇÃO DA LÓGICA: Incrementa o contador de jogadas
+        # (Substitui o antigo 'semana_ultimo_desafio')
         user_doc.reference.update({
-            "semana_ultimo_desafio": semana_atual
+            "desafio_week": semana_atual, # Garante que a semana está correta
+            "desafio_plays": Increment(1)  # Incrementa o número de jogadas
         })
 
         return {
