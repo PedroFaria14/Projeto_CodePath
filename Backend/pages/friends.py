@@ -1,3 +1,6 @@
+# Arquivo: pages/friends.py
+# (ATUALIZADO com endpoint /leaderboard)
+
 import random
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel, EmailStr
@@ -6,6 +9,7 @@ from firebase_config import db
 from google.cloud.firestore_v1.base_query import FieldFilter
 from google.cloud.firestore_v1.client import Client
 from typing import List, Dict, Any
+from google.cloud import firestore # 🚀 ADICIONADO
 
 router = APIRouter()
 
@@ -13,10 +17,10 @@ router = APIRouter()
 
 class AmizadeRequest(BaseModel):
     email_solicitante: str
-    email_receptor: str # O email do usuário que foi encontrado na busca
+    email_receptor: str
 
 class PedidoAmizadeResponse(BaseModel):
-    id_pedido: str # O ID do documento da amizade
+    id_pedido: str
 
 class RemoverAmigoRequest(BaseModel):
     email_usuario_atual: str
@@ -78,11 +82,6 @@ async def buscar_usuario_por_nome(nome_parcial: str, email_atual: str):
         
     try:
         users_ref = db.collection("usuarios")
-        
-        # Firestore não suporta 'LIKE' ou 'contains'. A melhor aproximação é
-        # buscar por 'começa com'. Ex: "Ped" acha "Pedro".
-        # Nota: Isso é case-sensitive. "pedro" é diferente de "Pedro".
-        # Para melhorar, você pode salvar um campo 'nome_lowercase' no registro.
         
         query = users_ref.where(
             filter=FieldFilter("nome", ">=", nome_parcial)
@@ -279,7 +278,7 @@ async def remover_amigo(payload: RemoverAmigoRequest):
     
 @router.get("/amigos/sugestoes/{email_jogador}", tags=["Amigos"])
 async def get_sugestoes_amigos(email_jogador: str):
- 
+
     try:
         users_ref = db.collection("usuarios")
         
@@ -308,3 +307,40 @@ async def get_sugestoes_amigos(email_jogador: str):
     except Exception as e:
         print(f"❌ Erro ao buscar sugestões: {e}")
         raise HTTPException(status_code=500, detail="Erro ao buscar sugestões.")
+
+
+# --- 👇 ENDPOINT /leaderboard ADICIONADO E ATUALIZADO 👇 ---
+@router.get("/leaderboard", tags=["Leaderboard"])
+async def get_leaderboard():
+    """
+    Busca os 10 jogadores com maior pontuação (weekly_score).
+    Requer um índice de campo único no Firestore:
+    Coleção: 'usuarios', Campo: 'weekly_score', Ordem: 'Decrescente'
+    """
+    try:
+        users_ref = db.collection("usuarios")
+        
+        # 1. Cria a consulta usando 'weekly_score'
+        query = users_ref.order_by(
+            "weekly_score", # 🚀 ALTERADO DE 'rank_score'
+            direction=firestore.Query.DESCENDING
+        ).limit(10)
+        
+        # 2. Executa a consulta
+        docs = query.stream()
+        
+        leaderboard = []
+        for doc in docs:
+            user_data = doc.to_dict()
+            leaderboard.append({
+                "nome": user_data.get("nome", "Usuário Anônimo"),
+                # 🚀 ENVIA O 'weekly_score'
+                "rank_score": user_data.get("weekly_score", 1000) # Usa 1000 como padrão
+            })
+            
+        return {"success": True, "leaderboard": leaderboard}
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar leaderboard: {e}")
+        # O erro mais provável aqui é de índice faltando
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar leaderboard: {e}")

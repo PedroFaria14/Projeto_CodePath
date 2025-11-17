@@ -1,4 +1,5 @@
-# Arquivo: convite.py (ALTERADO PARA INCLUIR RANK)
+# Arquivo: pages/convite.py 
+# (ATUALIZADO com rank E weekly_score)
 
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
@@ -10,10 +11,10 @@ import random
 from typing import List, Dict, Any, Optional
 
 try:
-    # 🚀 Tenta importar as duas funções
-    from pages.battles import get_perguntas_aleatorias, atualizar_rank
+    # 🚀 Tenta importar as TRÊS funções
+    from pages.battles import get_perguntas_aleatorias, atualizar_rank, atualizar_weekly_score
 except ImportError:
-    print("WARNING: Falha ao importar 'get_perguntas_aleatorias' ou 'atualizar_rank' de batalha.py. Usando fallback.")
+    print("WARNING: Falha ao importar funções de batalha.py. Usando fallback.")
     
     # Fallback para get_perguntas_aleatorias
     async def get_perguntas_aleatorias(nivel: str, count: int = 10) -> List[Dict[str, Any]]:
@@ -35,9 +36,14 @@ except ImportError:
         perguntas_escolhidas = random.sample(lista_perguntas, num_a_pegar)
         return perguntas_escolhidas
     
-    # 🚀 Adiciona um fallback para atualizar_rank
+    # 🚀 Adiciona fallback para atualizar_rank
     async def atualizar_rank(email: str, vitoria: bool):
         print(f"WARNING: Usando fallback 'atualizar_rank' para {email}. Rank não será alterado.")
+        pass
+
+    # 🚀 Adiciona fallback para atualizar_weekly_score
+    async def atualizar_weekly_score(email: str, vitoria: bool):
+        print(f"WARNING: Usando fallback 'atualizar_weekly_score' para {email}. Rank semanal não será alterado.")
         pass
 
 router = APIRouter()
@@ -45,10 +51,9 @@ router = APIRouter()
 # --- CONSTANTES ATUALIZADAS ---
 MOEDAS_VITORIA_CONVITE = 25
 MOEDAS_DERROTA_EMPATE_CONVITE = 5
-RANK_VITORIA_CONVITE = 10       # 🚀 ADICIONADO
-RANK_DERROTA_CONVITE = -10      # 🚀 ADICIONADO
-RANK_EMPATE_CONVITE = 0         # 🚀 ADICIONADO
-# 🚀 REMOVIDO: RANK_CHANGE_CONVITE = 0 
+RANK_VITORIA_CONVITE = 10
+RANK_DERROTA_CONVITE = -10
+RANK_EMPATE_CONVITE = 0
 
 class ConviteCreateRequest(BaseModel):
     email_desafiante: str
@@ -163,7 +168,6 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
             titulo_notificacao_oponente = ""
             status_final_jogador_atual = "" 
             
-            # 🚀 Variáveis para guardar o rank
             rank_jogador_atual = 0
             rank_oponente = 0
 
@@ -172,7 +176,6 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
             elif placar_B > placar_A:
                 email_vencedor = partida_data.get("email_desafiado")
             
-            # 🚀 Define os placares para clareza (Correção do placar confuso)
             pontuacao_jogador_atual = 0
             pontuacao_oponente = 0
             
@@ -183,10 +186,7 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
                 pontuacao_jogador_atual = placar_B
                 pontuacao_oponente = placar_A
 
-            # Mensagem para o jogador ATUAL (que está online)
             mensagem_jogador_atual = f"Batalha finalizada! Placar: {pontuacao_jogador_atual} a {pontuacao_oponente}"
-            
-            # Mensagem para o oponente (que está OFFLINE)
             mensagem_notificacao_oponente = f"Sua batalha contra {email_jogador_atual} terminou! Placar: {pontuacao_oponente} a {pontuacao_jogador_atual}."
             
             if placar_A == placar_B:
@@ -205,9 +205,13 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
                 moedas_jogador_atual = MOEDAS_VITORIA_CONVITE
                 moedas_oponente = MOEDAS_DERROTA_EMPATE_CONVITE
                 
-                # 🚀 ATUALIZA O RANK DE AMBOS
                 await atualizar_rank(email_jogador_atual, vitoria=True) 
                 await atualizar_rank(email_oponente_offline, vitoria=False)
+                
+                # 🚀 ATUALIZA O PLACAR SEMANAL
+                await atualizar_weekly_score(email_jogador_atual, vitoria=True)
+                await atualizar_weekly_score(email_oponente_offline, vitoria=False)
+                
                 rank_jogador_atual = RANK_VITORIA_CONVITE
                 rank_oponente = RANK_DERROTA_CONVITE
             
@@ -218,9 +222,13 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
                 moedas_jogador_atual = MOEDAS_DERROTA_EMPATE_CONVITE
                 moedas_oponente = MOEDAS_VITORIA_CONVITE
                 
-                # 🚀 ATUALIZA O RANK DE AMBOS
                 await atualizar_rank(email_jogador_atual, vitoria=False)
                 await atualizar_rank(email_oponente_offline, vitoria=True)
+                
+                # 🚀 ATUALIZA O PLACAR SEMANAL
+                await atualizar_weekly_score(email_jogador_atual, vitoria=False)
+                await atualizar_weekly_score(email_oponente_offline, vitoria=True)
+                
                 rank_jogador_atual = RANK_DERROTA_CONVITE
                 rank_oponente = RANK_VITORIA_CONVITE
             
@@ -230,8 +238,8 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
             db.collection("notificacoes").add({
                 "email": email_oponente_offline,
                 "titulo": titulo_notificacao_oponente,
-                "mensagem": mensagem_notificacao_oponente, # 🚀 MENSAGEM CORRIGIDA
-                "rank_change": rank_oponente, # 🚀 VALOR DE RANK CORRIGIDO
+                "mensagem": mensagem_notificacao_oponente,
+                "rank_change": rank_oponente,
                 "moedas_ganhas": moedas_oponente,
                 "lido": False,
                 "timestamp": datetime.datetime.utcnow()
@@ -241,9 +249,9 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
             
             return {
                 "status_final": status_final_jogador_atual, 
-                "message": mensagem_jogador_atual, # 🚀 MENSAGEM CORRIGIDA
+                "message": mensagem_jogador_atual,
                 "vencedor": update_data["vencedor"],
-                "rank_change": rank_jogador_atual, # 🚀 VALOR DE RANK CORRIGIDO
+                "rank_change": rank_jogador_atual,
                 "moedas_ganhas": moedas_jogador_atual
             }
         
@@ -258,7 +266,7 @@ async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
             return {
                 "status_final": "AGUARDANDO_OPONENTE",
                 "message": "Seu placar foi salvo! Aguardando seu oponente jogar.",
-                "rank_change": 0, # Correto, o rank só muda no final
+                "rank_change": 0,
                 "moedas_ganhas": 0
             }
             

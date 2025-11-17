@@ -1,5 +1,5 @@
 # Arquivo: pages/batalha.py
-# (ATUALIZADO com sistema de Notificações)
+# (ATUALIZADO com weekly_score)
 
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
@@ -17,9 +17,9 @@ router = APIRouter()
 RANK_CHANGE_VITORIA = 10
 RANK_CHANGE_DERROTA = -10
 MOEDAS_VITORIA_ALEATORIA = 50
-MOEDAS_DERROTA_EMPATE = 5 # <--- NOVO (Prêmio de consolação)
+MOEDAS_DERROTA_EMPATE = 5
 
-# --- (Modelos Pydantic) ---
+# --- (Modelos Pydantic - Sem alterações) ---
 class BatalhaInitRequest(BaseModel):
     email: str
     nivel: str 
@@ -37,7 +37,6 @@ class BatalhaInitResponse(BaseModel):
     id_batalha_oponente: Optional[str] = None
     pontuacao_oponente: Optional[int] = None
 
-# --- NOVOS MODELOS PARA NOTIFICAÇÃO ---
 class MarcarLidoRequest(BaseModel):
     notificacao_id: str
     
@@ -52,7 +51,7 @@ class BatalhaNotificacao(BaseModel):
     timestamp: datetime.datetime
 
 
-# --- (Funções Auxiliares - get_perguntas_aleatorias, get_rank_score, etc. - Sem alterações) ---
+# --- (Funções Auxiliares - Sem alterações) ---
 async def get_perguntas_aleatorias(nivel: str, count: int = 10) -> List[Dict[str, Any]]:
     mapa_niveis = {
         "iniciante": ["Facil"],
@@ -78,9 +77,12 @@ async def get_rank_score(email: str) -> int:
         return 1000 
     user_doc = user_ref_query[0]
     user_data = user_doc.to_dict()
+    # 🚀 Garante que o usuário tenha os campos de rank
     if "rank_score" not in user_data:
         user_doc.reference.update({"rank_score": 1000})
-        return 1000
+    if "weekly_score" not in user_data:
+        user_doc.reference.update({"weekly_score": 1000})
+        
     return user_data.get("rank_score", 1000)
 
 async def atualizar_rank(email: str, vitoria: bool):
@@ -96,6 +98,35 @@ async def atualizar_rank(email: str, vitoria: bool):
         score_novo = max(score_atual + RANK_CHANGE_DERROTA, 0)
     user_doc.reference.update({"rank_score": score_novo})
 
+
+# --- 👇 NOVA FUNÇÃO PARA O PLACAR SEMANAL 👇 ---
+async def atualizar_weekly_score(email: str, vitoria: bool):
+    """
+    Atualiza o 'weekly_score' (placar semanal) do usuário.
+    Usa as mesmas constantes de rank.
+    """
+    user_ref_query = db.collection("usuarios").where(filter=FieldFilter("email", "==", email)).limit(1).get()
+    if not user_ref_query:
+        return
+        
+    user_doc = user_ref_query[0]
+    user_data = user_doc.to_dict()
+    
+    # Busca o 'weekly_score', se não existir, cria com 1000
+    score_atual = user_data.get("weekly_score", 1000)
+    if "weekly_score" not in user_data:
+        user_doc.reference.update({"weekly_score": 1000})
+    
+    if vitoria:
+        score_novo = score_atual + RANK_CHANGE_VITORIA
+    else:
+        score_novo = max(score_atual + RANK_CHANGE_DERROTA, 0) # Não deixa ficar negativo
+        
+    # Atualiza o campo 'weekly_score'
+    user_doc.reference.update({"weekly_score": score_novo})
+# --- 👆 FIM DA NOVA FUNÇÃO 👆 ---
+
+
 async def atualizar_moedas(email: str, quantidade: int):
     if quantidade <= 0: # Não faz nada se for 0
         return
@@ -110,7 +141,7 @@ async def atualizar_moedas(email: str, quantidade: int):
 # --- (Endpoint /batalha/iniciar - Sem alterações) ---
 @router.post("/batalha/iniciar", response_model=BatalhaInitResponse, tags=["Batalha Ranqueada"])
 async def iniciar_batalha(payload: BatalhaInitRequest):
-    # ... (código idêntico)
+    # Matchmaking continua usando o rank_score total
     try:
         rank_jogador_atual = await get_rank_score(payload.email)
         rank_min = rank_jogador_atual - 100
@@ -167,7 +198,7 @@ async def finalizar_batalha(payload: BatalhaFinalizarRequest):
                 "status_final": "AGUARDANDO_OPONENTE",
                 "message": "Placar salvo! Assim que um oponente jogar, avisaremos o resultado.",
                 "rank_change": 0,
-                "moedas_ganhas": 0
+                "moedas_ganhas": 0 # Você pode mudar isso para MOEDAS_DERROTA_EMPATE se quiser
             }
 
         # CASO 2: "DESAFIO_EXISTENTE" (Resultado imediato)
@@ -181,7 +212,11 @@ async def finalizar_batalha(payload: BatalhaFinalizarRequest):
             await atualizar_rank(payload.email, vitoria=True) 
             await atualizar_moedas(payload.email, MOEDAS_VITORIA_ALEATORIA) 
             await atualizar_rank(email_oponente, vitoria=False)
-            await atualizar_moedas(email_oponente, MOEDAS_DERROTA_EMPATE) # Oponente ganha prêmio de consolação
+            await atualizar_moedas(email_oponente, MOEDAS_DERROTA_EMPATE)
+            
+            # 🚀 ATUALIZA O PLACAR SEMANAL DE AMBOS
+            await atualizar_weekly_score(payload.email, vitoria=True)
+            await atualizar_weekly_score(email_oponente, vitoria=False)
             
             # CRIA NOTIFICAÇÃO PARA O OPONENTE OFFLINE
             db.collection("notificacoes").add({
@@ -206,9 +241,13 @@ async def finalizar_batalha(payload: BatalhaFinalizarRequest):
         # DERROTA
         elif payload.pontuacao < pontuacao_oponente:
             await atualizar_rank(payload.email, vitoria=False) 
-            await atualizar_moedas(payload.email, MOEDAS_DERROTA_EMPATE) # Prêmio de consolação
+            await atualizar_moedas(payload.email, MOEDAS_DERROTA_EMPATE)
             await atualizar_rank(email_oponente, vitoria=True)
-            await atualizar_moedas(email_oponente, MOEDAS_VITORIA_ALEATORIA) # Oponente ganha
+            await atualizar_moedas(email_oponente, MOEDAS_VITORIA_ALEATORIA)
+            
+            # 🚀 ATUALIZA O PLACAR SEMANAL DE AMBOS
+            await atualizar_weekly_score(payload.email, vitoria=False)
+            await atualizar_weekly_score(email_oponente, vitoria=True)
             
             # CRIA NOTIFICAÇÃO PARA O OPONENTE OFFLINE
             db.collection("notificacoes").add({
@@ -231,8 +270,10 @@ async def finalizar_batalha(payload: BatalhaFinalizarRequest):
         
         # EMPATE
         else:
-            await atualizar_moedas(payload.email, MOEDAS_DERROTA_EMPATE) # Prêmio de consolação
-            await atualizar_moedas(email_oponente, MOEDAS_DERROTA_EMPATE) # Prêmio de consolação
+            await atualizar_moedas(payload.email, MOEDAS_DERROTA_EMPATE)
+            await atualizar_moedas(email_oponente, MOEDAS_DERROTA_EMPATE)
+            
+            # Empates não afetam o rank nem o placar semanal
             
             # CRIA NOTIFICAÇÃO PARA O OPONENTE OFFLINE
             db.collection("notificacoes").add({
