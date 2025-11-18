@@ -1,4 +1,5 @@
-// Arquivo: batalha_page.dart (Atualizado com Provider)
+// Arquivo: batalha_page.dart
+// 🚀 MIX: Múltipla Escolha, Word Bank e Drag & Drop
 
 import 'dart:async';
 import 'dart:convert';
@@ -7,11 +8,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'resultado_dialog.dart';
-
-// 🚀 IMPORTS DO PROVIDER
 import 'package:provider/provider.dart';
 import 'package:codepath/providers/user_provider.dart';
+import 'package:collection/collection.dart';
+import 'resultado_dialog.dart';
 
 class BatalhaPage extends StatefulWidget {
   final List<Map<String, dynamic>> perguntas;
@@ -38,17 +38,31 @@ class _BatalhaPageState extends State<BatalhaPage> {
   int currentQuestionIndex = 0;
   int acertos = 0;
   bool carregando = true;
-  String enunciado = "";
-  List<String> alternativas = [];
-  String respostaCorreta = "";
-  int? alternativaSelecionada;
   bool respostaEnviada = false;
+
   Timer? _timer;
-  final int _tempoTotalBatalha = 120; // 2 minutos
+  final int _tempoTotalBatalha = 120;
   int _segundosRestantes = 120;
   final Stopwatch _stopwatch = Stopwatch();
   String _userEmail = "";
   final String _baseUrl = "https://projeto-codepath.onrender.com";
+
+  // Estados Gerais
+  String _perguntaTipoAtual = "";
+
+  // Fase 1 (Multipla Escolha)
+  int? alternativaSelecionada;
+
+  // Fase 2 (Word Bank)
+  String _fase2Enunciado = "";
+  String _fase2Dica = "";
+  List<String> _palavrasSelecionadas = [];
+  List<String> _palavrasDisponiveis = [];
+
+  // Fase 3 (Drag & Drop)
+  String _fase3Titulo = "";
+  List<String> _blocosParaOrdenar = [];
+  List<String> _blocosOrdemCorreta = [];
 
   @override
   void initState() {
@@ -83,9 +97,7 @@ class _BatalhaPageState extends State<BatalhaPage> {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_segundosRestantes > 0) {
         if (mounted) {
-          setState(() {
-            _segundosRestantes--;
-          });
+          setState(() => _segundosRestantes--);
         }
       } else {
         timer.cancel();
@@ -106,31 +118,62 @@ class _BatalhaPageState extends State<BatalhaPage> {
       return;
     }
     final pergunta = quizQuestions[currentQuestionIndex];
-    List<String> opcoesEmbaralhadas = List<String>.from(
-      pergunta["opcoes"] ?? [],
-    );
-    opcoesEmbaralhadas.shuffle();
+
     setState(() {
-      enunciado = pergunta["pergunta"] ?? "Erro: Pergunta não encontrada";
-      alternativas = opcoesEmbaralhadas;
-      respostaCorreta = pergunta["resposta_correta"] ?? "";
-      alternativaSelecionada = null;
       respostaEnviada = false;
+      // Detecta o tipo (se não vier, assume drag_and_drop por segurança)
+      _perguntaTipoAtual = pergunta["tipo"] ?? "multipla_escolha";
+
+      if (_perguntaTipoAtual == "multipla_escolha") {
+        alternativaSelecionada = null;
+        // Opções já vêm do backend
+      } else if (_perguntaTipoAtual == "codigo_snippet_word_bank") {
+        _fase2Enunciado = pergunta["texto_pergunta"] ?? "";
+        _fase2Dica = pergunta["dica"] ?? "";
+        _palavrasSelecionadas.clear();
+        final List<String> banco = List<String>.from(
+          pergunta["palavras_banco"] ?? [],
+        );
+        banco.shuffle();
+        _palavrasDisponiveis = banco;
+      } else if (_perguntaTipoAtual == "drag_and_drop") {
+        _fase3Titulo = pergunta["titulo"] ?? "";
+        _blocosOrdemCorreta = List<String>.from(
+          pergunta["partes_codigo"] ?? [],
+        );
+        _blocosParaOrdenar = List<String>.from(_blocosOrdemCorreta);
+        _blocosParaOrdenar.shuffle();
+      }
     });
   }
 
   void _validarResposta() {
-    if (alternativaSelecionada == null || respostaEnviada) return;
-    setState(() => respostaEnviada = true);
+    if (respostaEnviada) return;
 
-    final String respostaSelecionada = alternativas[alternativaSelecionada!];
-    final bool correta = (respostaSelecionada == respostaCorreta);
+    final perguntaAtual = quizQuestions[currentQuestionIndex];
+    bool correta = false;
 
-    if (correta) {
-      setState(() {
-        acertos++;
-      });
+    if (_perguntaTipoAtual == "multipla_escolha") {
+      if (alternativaSelecionada == null) return;
+      final opcoes = List<String>.from(perguntaAtual["opcoes"]);
+      final escolhida = opcoes[alternativaSelecionada!];
+      correta = (escolhida == perguntaAtual["resposta_correta"]);
+    } else if (_perguntaTipoAtual == "codigo_snippet_word_bank") {
+      final respostaUsuario = _palavrasSelecionadas.join("");
+      final respostaCorreta = (perguntaAtual["resposta_correta"] ?? "")
+          .replaceAll(' ', '');
+      correta = (respostaUsuario.replaceAll(' ', '') == respostaCorreta);
+    } else if (_perguntaTipoAtual == "drag_and_drop") {
+      correta = const ListEquality().equals(
+        _blocosParaOrdenar,
+        _blocosOrdemCorreta,
+      );
     }
+
+    setState(() {
+      respostaEnviada = true;
+      if (correta) acertos++;
+    });
 
     final bool isLast = currentQuestionIndex == quizQuestions.length - 1;
 
@@ -143,7 +186,6 @@ class _BatalhaPageState extends State<BatalhaPage> {
           isLastQuestion: isLast,
           onClose: () {
             Navigator.pop(dialogContext);
-
             if (isLast) {
               _finalizarBatalha(porTempo: false);
             } else {
@@ -163,11 +205,7 @@ class _BatalhaPageState extends State<BatalhaPage> {
     _stopwatch.stop();
     final double tempoGasto = _stopwatch.elapsedMilliseconds / 1000.0;
 
-    if (porTempo) {
-      setState(() {
-        respostaEnviada = true;
-      });
-    }
+    if (porTempo) setState(() => respostaEnviada = true);
 
     showDialog(
       context: context,
@@ -197,7 +235,6 @@ class _BatalhaPageState extends State<BatalhaPage> {
           "pontuacao_oponente": widget.pontuacaoOponente,
         };
       } else {
-        // "CONVITE"
         endpoint = "/convite/finalizar";
         body = {
           "id_convite": widget.idConvite,
@@ -214,19 +251,15 @@ class _BatalhaPageState extends State<BatalhaPage> {
       );
 
       if (!mounted) return;
-      Navigator.pop(context); // Fecha o loading
+      Navigator.pop(context);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
         final String statusFinal = data["status_final"] ?? "CONCLUIDO";
         final String mensagem = data["message"] ?? "Batalha Concluída!";
         final int rankChange = (data["rank_change"] as num? ?? 0).toInt();
         final int moedasGanhas = (data["moedas_ganhas"] as num? ?? 0).toInt();
 
-        // 🚀 AQUI ESTÁ A ATUALIZAÇÃO
-        // Atualiza o estado global ANTES de mostrar o pop-up
-        // Isso só afeta resultados imediatos (não os "aguardando")
         if (statusFinal != "AGUARDANDO_OPONENTE") {
           Provider.of<UserProvider>(
             context,
@@ -241,29 +274,29 @@ class _BatalhaPageState extends State<BatalhaPage> {
           moedasGanhas,
         );
       } else {
-        throw Exception("Erro ${response.statusCode}: ${response.body}");
+        throw Exception("Erro ${response.statusCode}");
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context); // Fecha o loading
-      print("Erro ao finalizar batalha: $e");
-      _showResultadoFinalDialog("ERRO", "Erro ao enviar placar: $e", 0, 0);
+      if (mounted) Navigator.pop(context);
+      print("Erro ao finalizar: $e");
+      _showResultadoFinalDialog("ERRO", "Erro de conexão", 0, 0);
     }
   }
 
   void _showResultadoFinalDialog(
     String status,
-    String mensagem,
-    int rankChange,
-    int moedasGanhas,
+    String msg,
+    int rank,
+    int moedas,
   ) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => ResultadoFinalDialog(
         status: status,
-        mensagem: mensagem,
-        rankChange: rankChange,
-        moedasGanhas: moedasGanhas,
+        mensagem: msg,
+        rankChange: rank,
+        moedasGanhas: moedas,
         onClose: () {
           Navigator.pop(ctx);
           Navigator.pop(context);
@@ -286,9 +319,9 @@ class _BatalhaPageState extends State<BatalhaPage> {
             Text(
               "Acertos: $acertos",
               style: const TextStyle(
-                color: Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
+                color: Colors.white,
               ),
             ),
             Text(
@@ -301,31 +334,26 @@ class _BatalhaPageState extends State<BatalhaPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white, size: 28),
-          onPressed: () {
-            // TODO: Adicionar um "Tem certeza que quer desistir?"
-            Navigator.pop(context);
-          },
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          // Timer
           Container(
             margin: const EdgeInsets.only(right: 10),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white24,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                Icon(Icons.timer_outlined, color: Colors.white, size: 20),
+                const Icon(Icons.timer_outlined, color: Colors.white, size: 20),
                 const SizedBox(width: 5),
                 Text(
                   _tempoFormatado,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
                   ),
                 ),
               ],
@@ -334,8 +362,6 @@ class _BatalhaPageState extends State<BatalhaPage> {
         ],
       ),
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -351,19 +377,19 @@ class _BatalhaPageState extends State<BatalhaPage> {
         child: SafeArea(
           child: carregando
               ? const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF3CB371)),
+                  child: CircularProgressIndicator(color: Colors.green),
                 )
               : Column(
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 8.0,
+                        horizontal: 16,
+                        vertical: 8,
                       ),
                       child: LinearProgressIndicator(
                         value:
                             (currentQuestionIndex + 1) / quizQuestions.length,
-                        backgroundColor: Colors.white.withOpacity(0.4),
+                        backgroundColor: Colors.white38,
                         color: const Color(0xFF3CB371),
                         minHeight: 6,
                       ),
@@ -378,106 +404,264 @@ class _BatalhaPageState extends State<BatalhaPage> {
   }
 
   Widget _buildQuizBody() {
+    Widget questionWidget;
+    if (_perguntaTipoAtual == "multipla_escolha") {
+      questionWidget = _buildMultipleChoice();
+    } else if (_perguntaTipoAtual == "codigo_snippet_word_bank") {
+      questionWidget = _buildWordBank();
+    } else if (_perguntaTipoAtual == "drag_and_drop") {
+      questionWidget = _buildDragAndDrop();
+    } else {
+      questionWidget = const Center(child: Text("Erro de Tipo"));
+    }
     return Expanded(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-        child: Column(
-          children: [
-            _buildModernCard(
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  enunciado,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Alternativas
-            ...alternativas.asMap().entries.map((entry) {
-              final index = entry.key;
-              final texto = entry.value;
-              bool isSelected = alternativaSelecionada == index;
-
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isSelected
-                        ? Colors.white
-                        : Colors.white.withOpacity(0.8),
-                    foregroundColor: Colors.black87,
-                    minimumSize: const Size(double.infinity, 55),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: isSelected
-                          ? const BorderSide(
-                              color: Color(0xFF3CB371),
-                              width: 2.5,
-                            )
-                          : BorderSide(color: Colors.grey.shade300, width: 1),
-                    ),
-                    shadowColor: Colors.black.withOpacity(0.2),
-                    elevation: isSelected ? 6 : 3,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                  onPressed: respostaEnviada
-                      ? null
-                      : () {
-                          setState(() => alternativaSelecionada = index);
-                        },
-                  child: Text(
-                    texto,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                    ),
-                  ),
-                ),
-              );
-            }),
-            const SizedBox(height: 20),
-          ],
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: questionWidget,
       ),
     );
   }
 
+  // --- WIDGETS ESPECÍFICOS ---
+
+  Widget _buildMultipleChoice() {
+    final pergunta = quizQuestions[currentQuestionIndex];
+    final opcoes = List<String>.from(pergunta["opcoes"] ?? []);
+    final enunciado = pergunta["pergunta"] ?? "";
+
+    return Column(
+      children: [
+        _buildModernCard(
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              enunciado,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        ...opcoes.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final txt = entry.value;
+          final isSelected = alternativaSelecionada == idx;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: ElevatedButton(
+              onPressed: respostaEnviada
+                  ? null
+                  : () => setState(() => alternativaSelecionada = idx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isSelected ? Colors.white : Colors.white70,
+                foregroundColor: Colors.black87,
+                minimumSize: const Size(double.infinity, 55),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: isSelected
+                      ? const BorderSide(color: Colors.green, width: 3)
+                      : BorderSide.none,
+                ),
+              ),
+              child: Text(txt, style: const TextStyle(fontSize: 16)),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildWordBank() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildModernCard(
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: const Text(
+              "Complete o Código",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _buildModernCard(
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.grey[200],
+            child: Text(
+              _fase2Enunciado.replaceAll("____", " [ ___ ] "),
+              style: GoogleFonts.sourceCodePro(fontSize: 16),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        // Caixa de Resposta
+        Container(
+          constraints: const BoxConstraints(minHeight: 60),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white54,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white),
+          ),
+          child: _palavrasSelecionadas.isEmpty
+              ? const Center(
+                  child: Text(
+                    "Toque nas palavras...",
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                )
+              : Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _palavrasSelecionadas
+                      .map(
+                        (p) => Chip(
+                          label: Text(
+                            p,
+                            style: GoogleFonts.sourceCodePro(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          onDeleted: () {
+                            if (respostaEnviada) return;
+                            setState(() {
+                              _palavrasSelecionadas.remove(p);
+                              _palavrasDisponiveis.add(p);
+                            });
+                          },
+                        ),
+                      )
+                      .toList(),
+                ),
+        ),
+        const Divider(height: 30, thickness: 1),
+        // Botões
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          alignment: WrapAlignment.center,
+          children: _palavrasDisponiveis
+              .map(
+                (p) => OutlinedButton(
+                  onPressed: () {
+                    if (respostaEnviada) return;
+                    setState(() {
+                      _palavrasDisponiveis.remove(p);
+                      _palavrasSelecionadas.add(p);
+                    });
+                  },
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.grey),
+                  ),
+                  child: Text(
+                    p,
+                    style: GoogleFonts.sourceCodePro(
+                      fontSize: 16,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDragAndDrop() {
+    return Column(
+      children: [
+        _buildModernCard(
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: const Text(
+              "Organize o Código",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          _fase3Titulo,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 20),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.black12,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _blocosParaOrdenar.length,
+            itemBuilder: (ctx, idx) {
+              final code = _blocosParaOrdenar[idx];
+              return Card(
+                key: ValueKey(code),
+                elevation: 2,
+                margin: const EdgeInsets.all(6),
+                child: ListTile(
+                  title: Text(
+                    code,
+                    style: GoogleFonts.sourceCodePro(fontSize: 14),
+                  ),
+                  trailing: const Icon(Icons.drag_handle),
+                ),
+              );
+            },
+            onReorder: (oldIdx, newIdx) {
+              if (respostaEnviada) return;
+              setState(() {
+                if (newIdx > oldIdx) newIdx -= 1;
+                final item = _blocosParaOrdenar.removeAt(oldIdx);
+                _blocosParaOrdenar.insert(newIdx, item);
+              });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSubmitButton() {
-    bool canSubmit = alternativaSelecionada != null && !respostaEnviada;
+    bool canSubmit = false;
+    if (!respostaEnviada) {
+      if (_perguntaTipoAtual == "multipla_escolha")
+        canSubmit = alternativaSelecionada != null;
+      else if (_perguntaTipoAtual == "codigo_snippet_word_bank")
+        canSubmit = _palavrasSelecionadas.isNotEmpty;
+      else if (_perguntaTipoAtual == "drag_and_drop")
+        canSubmit = true;
+    }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0),
+      padding: const EdgeInsets.all(16),
       child: ElevatedButton(
         onPressed: canSubmit ? _validarResposta : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: canSubmit ? Colors.white : Colors.grey.shade300,
-          disabledBackgroundColor: Colors.grey.shade300,
-          foregroundColor: canSubmit
-              ? const Color(0xFF3CB371)
-              : Colors.grey.shade600,
+          backgroundColor: canSubmit ? Colors.white : Colors.grey,
+          foregroundColor: canSubmit ? Colors.green : Colors.black54,
           minimumSize: const Size(double.infinity, 50),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          shadowColor: Colors.black.withOpacity(0.4),
-          elevation: canSubmit ? 6 : 2,
         ),
         child: Text(
           respostaEnviada ? "AGUARDE..." : "ENVIAR",
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
     );
@@ -487,72 +671,52 @@ class _BatalhaPageState extends State<BatalhaPage> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.8),
+        color: Colors.white70,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            spreadRadius: 0,
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+            color: Colors.black12,
+            blurRadius: 10,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16.0),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-          child: Padding(padding: const EdgeInsets.all(12.0), child: child),
-        ),
-      ),
+      child: child,
     );
   }
 }
 
-// --- WIDGET DE MODAL SIMPLIFICADO ---
 class _BatalhaFeedbackModal extends StatelessWidget {
   final bool acertou;
   final bool isLastQuestion;
   final VoidCallback onClose;
-
   const _BatalhaFeedbackModal({
     required this.acertou,
     required this.isLastQuestion,
     required this.onClose,
   });
-
   @override
   Widget build(BuildContext context) {
-    final Color primaryColor = acertou
-        ? Colors.green.shade700
-        : Colors.red.shade700;
-    final String title = acertou ? "Correto!" : "Incorreto!";
-    final String buttonText = isLastQuestion ? "FINALIZAR" : "PRÓXIMA PERGUNTA";
-
+    final color = acertou ? Colors.green : Colors.red;
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Text(
-        title,
+        acertou ? "Correto!" : "Incorreto!",
         textAlign: TextAlign.center,
-        style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+        style: TextStyle(color: color, fontWeight: FontWeight.bold),
       ),
       content: Icon(
         acertou ? Icons.check_circle : Icons.cancel,
-        color: primaryColor,
+        color: color,
         size: 60,
       ),
-      actionsAlignment: MainAxisAlignment.center,
       actions: [
         ElevatedButton(
           onPressed: onClose,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primaryColor,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+          style: ElevatedButton.styleFrom(backgroundColor: color),
+          child: Text(
+            isLastQuestion ? "FINALIZAR" : "PRÓXIMO",
+            style: const TextStyle(color: Colors.white),
           ),
-          child: Text(buttonText),
         ),
       ],
     );
