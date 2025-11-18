@@ -1,5 +1,3 @@
-// Arquivo: PaginaHome.dart (CORRIGIDO com 4º ícone no BottomBar)
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -15,7 +13,8 @@ import 'amigos_page.dart';
 import 'batalha_page.dart';
 import 'resultado_dialog.dart';
 import 'convites_page.dart';
-import 'leaderboard_page.dart'; // 🚀 IMPORTA A TELA DO PLACAR
+import 'leaderboard_page.dart';
+import 'desafio_page.dart'; // Importa a página do desafio
 
 class PaginaHome extends StatefulWidget {
   const PaginaHome({super.key});
@@ -54,7 +53,6 @@ class _PaginaHomeState extends State<PaginaHome> {
     "Perguntas diversas": "Perguntas\nDiversas",
   };
   final Map<String, Map<String, dynamic>> _moduloMetadata = {
-    // ... (Seu mapa _moduloMetadata completo aqui, sem alterações) ...
     "Laços de Repetição": {
       "animal": "assets/imagens/Papagaio.png",
       "gradient": [const Color(0xFF4C7516), const Color(0xFF8EDB29)],
@@ -434,7 +432,7 @@ class _PaginaHomeState extends State<PaginaHome> {
             borderRadius: BorderRadius.circular(20),
           ),
           title: const Text(
-            "Arena de Batalha",
+            "Ninho do Corvo",
             textAlign: TextAlign.center,
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
@@ -666,34 +664,29 @@ class _PaginaHomeState extends State<PaginaHome> {
     }
   }
 
-  // --- 🚀 FUNÇÃO _onItemTapped ATUALIZADA PARA 4 BOTÕES 🚀 ---
+  // --- (Função _onItemTapped - ATUALIZADA) ---
   void _onItemTapped(int index) async {
-    // 1. Se o usuário clicar no ícone que JÁ ESTÁ ATIVO (Home), não faz nada
     if (index == _selectedIndex && index == 0) return;
 
-    // 2. Se o usuário clicar em "Home" (index 0)
     if (index == 0) {
       setState(() => _selectedIndex = 0);
       return;
     }
 
-    // 3. Se clicar em "Continuar" (index 1)
     if (index == 1) {
-      setState(() => _selectedIndex = 1); // Destaca o botão "Play"
+      setState(() => _selectedIndex = 1);
       if (modulos.isNotEmpty) {
         final moduloIndex = _currentPage.round().clamp(0, modulos.length - 1);
         await abrirTrilha(modulos[moduloIndex]);
       }
-      // QUANDO VOLTAR DA TRILHA, MARCA "HOME" (index 0) COMO ATIVO
       if (mounted) {
         setState(() => _selectedIndex = 0);
       }
       return;
     }
 
-    // 4. Se clicar em "Perfil" (index 2)
     if (index == 2) {
-      setState(() => _selectedIndex = 2); // Destaca o botão "Perfil"
+      setState(() => _selectedIndex = 2);
       final prefs = await SharedPreferences.getInstance();
       final email = prefs.getString("userEmail");
 
@@ -705,30 +698,26 @@ class _PaginaHomeState extends State<PaginaHome> {
         );
         await carregarUsuarioEContadores();
       }
-      // QUANDO VOLTAR DO PERFIL, MARCA "HOME" (index 0) COMO ATIVO
       if (mounted) {
         setState(() => _selectedIndex = 0);
       }
       return;
     }
 
-    // 🚀 5. SE CLICAR NO NOVO BOTÃO "PLACAR" (index 3)
     if (index == 3) {
-      setState(() => _selectedIndex = 3); // Destaca o botão "Placar"
+      setState(() => _selectedIndex = 3);
 
       if (!mounted) return;
       await Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const LeaderboardPage()),
       );
-      // QUANDO VOLTAR DO PLACAR, MARCA "HOME" (index 0) COMO ATIVO
       if (mounted) {
         setState(() => _selectedIndex = 0);
       }
       return;
     }
   }
-  // --- 👆 FIM DA CORREÇÃO 👆 ---
 
   // --- (Build) ---
   @override
@@ -1136,97 +1125,30 @@ class _PaginaHomeState extends State<PaginaHome> {
                       ),
                       const SizedBox(height: 20),
 
-                      // 🚀 CARD DO PLACAR DE LÍDERES FOI REMOVIDO DAQUI
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                        child: Container(
-                          height: 80,
-                          padding: const EdgeInsets.all(16.0),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                Color.fromARGB(255, 247, 129, 241),
-                                Color.fromARGB(255, 36, 165, 167),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(15),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 5,
-                                offset: Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.emoji_events,
-                                color: Colors.amber,
-                                size: 32,
-                              ),
-                              const SizedBox(width: 15),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
-                                    Text(
-                                      "Desafios Semanais",
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    Text(
-                                      "Em breve",
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.white70,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade500.withOpacity(0.5),
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.lock,
-                                      color: Colors.grey.shade300,
-                                      size: 20,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
+                      // ==========================================
+                      // 🚀 CARD DO DESAFIO SEMANAL (DESIGN ORIGINAL ATIVADO)
+                      // ==========================================
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20.0),
                         child: InkWell(
-                          onTap: _iniciarBatalha,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const DesafioPage(),
+                              ),
+                            );
+                          },
                           borderRadius: BorderRadius.circular(15),
                           child: Container(
                             height: 80,
                             padding: const EdgeInsets.all(16.0),
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [Color(0xFFD32F2F), Color(0xFFB71C1C)],
+                                colors: [
+                                  Color.fromARGB(255, 247, 129, 241), // Rosa
+                                  Color.fromARGB(255, 36, 165, 167), // Ciano
+                                ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
@@ -1242,8 +1164,8 @@ class _PaginaHomeState extends State<PaginaHome> {
                             child: Row(
                               children: [
                                 const Icon(
-                                  Icons.bolt_rounded,
-                                  color: Colors.white,
+                                  Icons.emoji_events, // Ícone de Troféu
+                                  color: Colors.amber,
                                   size: 32,
                                 ),
                                 const SizedBox(width: 15),
@@ -1254,7 +1176,7 @@ class _PaginaHomeState extends State<PaginaHome> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: const [
                                       Text(
-                                        "Arena de Batalha",
+                                        "Desafios Semanais",
                                         style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
@@ -1262,7 +1184,7 @@ class _PaginaHomeState extends State<PaginaHome> {
                                         ),
                                       ),
                                       Text(
-                                        "Desafie outro jogador!",
+                                        "Prove seu valor!", // Novo subtítulo
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: Colors.white70,
@@ -1272,6 +1194,7 @@ class _PaginaHomeState extends State<PaginaHome> {
                                   ),
                                 ),
                                 const Icon(
+                                  // Seta no lugar do cadeado
                                   Icons.arrow_forward_ios,
                                   color: Colors.white70,
                                   size: 20,
@@ -1281,13 +1204,112 @@ class _PaginaHomeState extends State<PaginaHome> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 12),
+
+                      // ==========================================
+                      // 🚀 CARD DA ARENA (NINHO DO CORVO) ATUALIZADO
+                      // ==========================================
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                        child: InkWell(
+                          onTap: _iniciarBatalha,
+                          borderRadius: BorderRadius.circular(15),
+                          child: Stack(
+                            // 1. Usamos o Stack para sobrepor a imagem
+                            clipBehavior:
+                                Clip.none, // Permite a imagem sair do card
+                            children: [
+                              // 2. Este é o card original, agora dentro do Stack
+                              Container(
+                                height: 80,
+                                padding: const EdgeInsets.all(16.0),
+                                decoration: BoxDecoration(
+                                  // 3. Novo gradiente "sombrio"
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF4A4A4A), // Cinza Chumbo
+                                      Color(0xFF2B2B2B), // Quase Preto
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(15),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black38,
+                                      blurRadius: 8,
+                                      offset: Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    // 4. Ícone de "inteligência"
+                                    const Icon(
+                                      Icons.psychology_outlined,
+                                      color: Colors.white,
+                                      size: 32,
+                                    ),
+                                    const SizedBox(width: 15),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: const [
+                                          // 5. Novo Título
+                                          Text(
+                                            "Ninho do Corvo",
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          // 6. Novo Subtítulo
+                                          Text(
+                                            "Teste sua astúcia na arena.",
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.white70,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.arrow_forward_ios,
+                                      color: Colors.white70,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // 7. A IMAGEM DO CORVO
+                              Positioned(
+                                top: 15, // Ajuste aqui (para cima/baixo)
+                                right: 10, // Ajuste aqui (esquerda/direita)
+                                child: Image.asset(
+                                  'assets/imagens/Corvo.png',
+                                  height: 70,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 20),
+                      // ==========================================
+                      // 🚀 FIM DA ATUALIZAÇÃO DO CARD
+                      // ==========================================
                     ],
                   ),
                 ],
               ),
       ),
-      // --- 🚀 BARRA DE NAVEGAÇÃO ATUALIZADA 🚀 ---
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
@@ -1299,9 +1321,8 @@ class _PaginaHomeState extends State<PaginaHome> {
             label: 'Continuar',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
-          // 🚀 NOVO BOTÃO DO PLACAR DE LÍDERES
           BottomNavigationBarItem(
-            icon: Icon(Icons.emoji_events_outlined), // Ícone de Troféu
+            icon: Icon(Icons.emoji_events_outlined),
             label: 'Placar',
           ),
         ],
