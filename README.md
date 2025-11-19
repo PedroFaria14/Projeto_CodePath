@@ -1,0 +1,1 @@
+O CodePath é uma aplicação móvel gamificada projetada para ensinar lógica de programação de forma interativa e divertida. Inspirado em apps como o Duolingo, o CodePath transforma o estudo em um jogo, onde o usuário avança por trilhas de conhecimento, ganha recompensas (moedas e XP) e compete com outros estudantes.
