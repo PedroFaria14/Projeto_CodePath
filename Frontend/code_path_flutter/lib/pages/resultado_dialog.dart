@@ -36,7 +36,7 @@ class ResultadoFinalDialog extends StatelessWidget {
       case "VITORIA":
       case "VOCÊ VENCEU!":
         titulo = "Você Venceu!";
-        textoPersonalizado = "🎉 Parabéns, você ganhou!";
+        textoPersonalizado = " Parabéns, você ganhou!";
         corStatus = corAppVerde;
         iconeStatus = Icons.emoji_events_rounded;
         break;
@@ -44,7 +44,7 @@ class ResultadoFinalDialog extends StatelessWidget {
       case "DERROTA":
       case "VOCÊ PERDEU!":
         titulo = "Você Perdeu!";
-        textoPersonalizado = "😢 Que pena! Você perdeu.";
+        textoPersonalizado = "Que pena! Você perdeu.";
         corStatus = Colors.red.shade700;
         iconeStatus = Icons.close_rounded;
         break;
@@ -52,7 +52,7 @@ class ResultadoFinalDialog extends StatelessWidget {
       case "EMPATE":
       case "EMPATE!":
         titulo = "Empate!";
-        textoPersonalizado = "🤝 Foi um empate, boa partida!";
+        textoPersonalizado = " Foi um empate, boa partida!";
         corStatus = corAppVerde;
         iconeStatus = Icons.handshake_rounded;
         break;

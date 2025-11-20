@@ -85,8 +85,11 @@ class _DesafioPageState extends State<DesafioPage> {
           }
           carregando = false;
         });
+
         _loadCurrentQuestion();
-        _iniciarTimer();
+
+        // 🚀 MUDANÇA AQUI: Não inicia o timer direto. Mostra as regras antes.
+        _mostrarRegras();
       } else {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -106,6 +109,124 @@ class _DesafioPageState extends State<DesafioPage> {
         ),
       );
     }
+  }
+
+  void _mostrarRegras() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // O usuário é obrigado a escolher uma opção
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Column(
+          children: [
+            Icon(Icons.emoji_events, size: 50, color: Colors.amber),
+            SizedBox(height: 10),
+            Text(
+              "Desafio Semanal",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // --- 1. AVISO DE TENTATIVAS (NOVO) ---
+            Container(
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(bottom: 15),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1), // Fundo vermelho claro
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.red[700]),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "Atenção: Você só tem 3 tentativas semanais.",
+                      style: TextStyle(
+                        color: Colors.red[900],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // --- Regras Normais ---
+            const Text(
+              "Prove seu conhecimento!",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 10),
+            const ListTile(
+              leading: Icon(Icons.check_circle_outline, color: Colors.green),
+              title: Text("Acerte pelo menos 6 de 10 questões."),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            const ListTile(
+              leading: Icon(Icons.timer, color: Colors.blue),
+              title: Text("Você tem 2 minutos no total."),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            const ListTile(
+              leading: Icon(Icons.star, color: Colors.purple),
+              title: Text("Ganhe Moedas e suba no Rank!"),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.spaceBetween, // Separa os botões
+        actionsPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 15,
+        ),
+        actions: [
+          // --- 2. BOTÃO VOLTAR (NOVO) ---
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx); // Fecha o PopUp
+              Navigator.pop(
+                context,
+              ); // Volta para a tela anterior (sai do desafio)
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
+            child: const Text(
+              "Voltar",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+
+          // --- Botão Começar ---
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3CB371),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx); // Fecha o diálogo
+              _iniciarTimer(); // Começa o jogo
+            },
+            child: const Text(
+              "COMEÇAR",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _iniciarTimer() {
@@ -575,17 +696,17 @@ class _DesafioPageState extends State<DesafioPage> {
   // -----------------------------------------------------------
   // 🚀 5. FASE 3: DRAG & DROP (LÓGICA IMPLEMENTADA)
   // -----------------------------------------------------------
+  // 🚀 CORREÇÃO: Adicionado ReorderableDragStartListener no ícone
   Widget _buildFase3DragAndDrop(Map<String, dynamic> pergunta) {
     final String titulo = pergunta["titulo"] ?? "Monte o código.";
 
     return Column(
       children: [
-        // Título da Fase (ATUALIZADO)
         _buildModernCard(
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Text(
-              "FASE 3: Organize o Código", // <-- TÍTULO TROCADO
+              "FASE 3: Organize o Código",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 18,
@@ -597,7 +718,6 @@ class _DesafioPageState extends State<DesafioPage> {
         ),
         const SizedBox(height: 15),
 
-        // Título da Pergunta
         Text(
           titulo,
           textAlign: TextAlign.center,
@@ -609,7 +729,6 @@ class _DesafioPageState extends State<DesafioPage> {
         ),
         const SizedBox(height: 20),
 
-        // Lista Reordenável
         Container(
           decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.1),
@@ -634,12 +753,20 @@ class _DesafioPageState extends State<DesafioPage> {
                       fontSize: 15,
                     ),
                   ),
-                  trailing: const Icon(Icons.drag_handle, color: Colors.grey),
+                  // ⬇️ AQUI ESTÁ O SEGREDO PARA FUNCIONAR O ARRASTAR ⬇️
+                  trailing: ReorderableDragStartListener(
+                    index: index,
+                    child: const Icon(
+                      Icons.drag_handle,
+                      color: Colors.grey,
+                      size: 30, // Aumentei um pouco para facilitar o toque
+                    ),
+                  ),
                 ),
               );
             },
             onReorder: (oldIndex, newIndex) {
-              if (respostaEnviada) return; // Bloqueia se já respondeu
+              if (respostaEnviada) return;
 
               setState(() {
                 if (newIndex > oldIndex) {

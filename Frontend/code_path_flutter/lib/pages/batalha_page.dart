@@ -1,6 +1,3 @@
-// Arquivo: batalha_page.dart
-// 🚀 MIX: Múltipla Escolha, Word Bank e Drag & Drop
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
@@ -11,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:codepath/providers/user_provider.dart';
 import 'package:collection/collection.dart';
-import 'resultado_dialog.dart';
 
 class BatalhaPage extends StatefulWidget {
   final List<Map<String, dynamic>> perguntas;
@@ -41,7 +37,6 @@ class _BatalhaPageState extends State<BatalhaPage> {
   bool respostaEnviada = false;
 
   Timer? _timer;
-  final int _tempoTotalBatalha = 120;
   int _segundosRestantes = 120;
   final Stopwatch _stopwatch = Stopwatch();
   String _userEmail = "";
@@ -121,12 +116,10 @@ class _BatalhaPageState extends State<BatalhaPage> {
 
     setState(() {
       respostaEnviada = false;
-      // Detecta o tipo (se não vier, assume drag_and_drop por segurança)
       _perguntaTipoAtual = pergunta["tipo"] ?? "multipla_escolha";
 
       if (_perguntaTipoAtual == "multipla_escolha") {
         alternativaSelecionada = null;
-        // Opções já vêm do backend
       } else if (_perguntaTipoAtual == "codigo_snippet_word_bank") {
         _fase2Enunciado = pergunta["texto_pergunta"] ?? "";
         _fase2Dica = pergunta["dica"] ?? "";
@@ -207,18 +200,12 @@ class _BatalhaPageState extends State<BatalhaPage> {
 
     if (porTempo) setState(() => respostaEnviada = true);
 
+    // Loading inicial
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 20),
-            Text("Enviando placar..."),
-          ],
-        ),
-      ),
+      builder: (ctx) =>
+          const Center(child: CircularProgressIndicator(color: Colors.white)),
     );
 
     try {
@@ -251,14 +238,15 @@ class _BatalhaPageState extends State<BatalhaPage> {
       );
 
       if (!mounted) return;
-      Navigator.pop(context);
+      Navigator.pop(context); // Fecha o loading
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final String statusFinal = data["status_final"] ?? "CONCLUIDO";
-        final String mensagem = data["message"] ?? "Batalha Concluída!";
+
         final int rankChange = (data["rank_change"] as num? ?? 0).toInt();
         final int moedasGanhas = (data["moedas_ganhas"] as num? ?? 0).toInt();
+        final String mensagem = data["message"] ?? "Aguardando...";
 
         if (statusFinal != "AGUARDANDO_OPONENTE") {
           Provider.of<UserProvider>(
@@ -267,42 +255,37 @@ class _BatalhaPageState extends State<BatalhaPage> {
           ).applyBattleRewards(rankChange, moedasGanhas);
         }
 
-        _showResultadoFinalDialog(
-          statusFinal,
-          mensagem,
-          rankChange,
-          moedasGanhas,
+        // 🚀 ABRE O DIALOG QUE SE ATUALIZA SOZINHO
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => ResultadoBatalhaDinamico(
+            statusInicial: statusFinal,
+            mensagemInicial: mensagem,
+            rankInicial: rankChange,
+            moedasInicial: moedasGanhas,
+            userEmail: _userEmail,
+            baseUrl: _baseUrl,
+            // 🚀 CORREÇÃO AQUI: Garante que fecha o dialog e a tela de batalha
+            onClose: () {
+              Navigator.of(ctx).pop(); // Fecha o Dialog
+
+              // Espera um pouquinho e fecha a tela de batalha
+              Future.delayed(const Duration(milliseconds: 50), () {
+                if (mounted) {
+                  Navigator.of(context).pop();
+                }
+              });
+            },
+          ),
         );
       } else {
         throw Exception("Erro ${response.statusCode}");
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context);
+      if (mounted && Navigator.canPop(context)) Navigator.pop(context);
       print("Erro ao finalizar: $e");
-      _showResultadoFinalDialog("ERRO", "Erro de conexão", 0, 0);
     }
-  }
-
-  void _showResultadoFinalDialog(
-    String status,
-    String msg,
-    int rank,
-    int moedas,
-  ) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => ResultadoFinalDialog(
-        status: status,
-        mensagem: msg,
-        rankChange: rank,
-        moedasGanhas: moedas,
-        onClose: () {
-          Navigator.pop(ctx);
-          Navigator.pop(context);
-        },
-      ),
-    );
   }
 
   @override
@@ -422,8 +405,6 @@ class _BatalhaPageState extends State<BatalhaPage> {
     );
   }
 
-  // --- WIDGETS ESPECÍFICOS ---
-
   Widget _buildMultipleChoice() {
     final pergunta = quizQuestions[currentQuestionIndex];
     final opcoes = List<String>.from(pergunta["opcoes"] ?? []);
@@ -501,7 +482,6 @@ class _BatalhaPageState extends State<BatalhaPage> {
           ),
         ),
         const SizedBox(height: 20),
-        // Caixa de Resposta
         Container(
           constraints: const BoxConstraints(minHeight: 60),
           padding: const EdgeInsets.all(8),
@@ -542,7 +522,6 @@ class _BatalhaPageState extends State<BatalhaPage> {
                 ),
         ),
         const Divider(height: 30, thickness: 1),
-        // Botões
         Wrap(
           spacing: 10,
           runSpacing: 10,
@@ -597,6 +576,7 @@ class _BatalhaPageState extends State<BatalhaPage> {
         Text(
           _fase3Titulo,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 20),
         Container(
@@ -619,7 +599,10 @@ class _BatalhaPageState extends State<BatalhaPage> {
                     code,
                     style: GoogleFonts.sourceCodePro(fontSize: 14),
                   ),
-                  trailing: const Icon(Icons.drag_handle),
+                  trailing: ReorderableDragStartListener(
+                    index: idx,
+                    child: const Icon(Icons.drag_handle, size: 30),
+                  ),
                 ),
               );
             },
@@ -715,6 +698,236 @@ class _BatalhaFeedbackModal extends StatelessWidget {
           style: ElevatedButton.styleFrom(backgroundColor: color),
           child: Text(
             isLastQuestion ? "FINALIZAR" : "PRÓXIMO",
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// 🚀 WIDGET DINÂMICO (CORRIGIDO)
+class ResultadoBatalhaDinamico extends StatefulWidget {
+  final String statusInicial;
+  final String mensagemInicial;
+  final int rankInicial;
+  final int moedasInicial;
+  final String userEmail;
+  final String baseUrl;
+  final VoidCallback onClose;
+
+  const ResultadoBatalhaDinamico({
+    super.key,
+    required this.statusInicial,
+    required this.mensagemInicial,
+    required this.rankInicial,
+    required this.moedasInicial,
+    required this.userEmail,
+    required this.baseUrl,
+    required this.onClose,
+  });
+
+  @override
+  State<ResultadoBatalhaDinamico> createState() =>
+      _ResultadoBatalhaDinamicoState();
+}
+
+class _ResultadoBatalhaDinamicoState extends State<ResultadoBatalhaDinamico> {
+  late String _status;
+  late String _mensagem;
+  late int _rank;
+  late int _moedas;
+  Timer? _timer;
+  bool _isWaiting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _status = widget.statusInicial;
+    _mensagem = widget.mensagemInicial;
+    _rank = widget.rankInicial;
+    _moedas = widget.moedasInicial;
+
+    if (_status == "AGUARDANDO_OPONENTE") {
+      _isWaiting = true;
+      _iniciarPolling();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _iniciarPolling() {
+    _timer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (!mounted) return;
+      try {
+        final response = await http.get(
+          Uri.parse(
+            "${widget.baseUrl}/notificacoes/pendentes/${widget.userEmail}",
+          ),
+        );
+
+        if (response.statusCode == 200) {
+          final List data = jsonDecode(response.body);
+          if (data.isNotEmpty) {
+            timer.cancel();
+            final notif = data.first;
+
+            final String titulo = notif['titulo'] ?? "";
+            String novoStatus = "VITORIA";
+            if (titulo.toUpperCase().contains("PERDEU")) novoStatus = "DERROTA";
+            if (titulo.toUpperCase().contains("EMPATE")) novoStatus = "EMPATE";
+
+            if (mounted) {
+              Provider.of<UserProvider>(
+                context,
+                listen: false,
+              ).applyBattleRewards(
+                (notif['rank_change'] as num).toInt(),
+                (notif['moedas_ganhas'] as num).toInt(),
+              );
+            }
+
+            await http.post(
+              Uri.parse("${widget.baseUrl}/notificacoes/marcar_como_lido"),
+              headers: {"Content-Type": "application/json"},
+              body: jsonEncode({"notificacao_id": notif['id']}),
+            );
+
+            if (mounted) {
+              setState(() {
+                _isWaiting = false;
+                _status = novoStatus;
+                _mensagem = notif['mensagem'] ?? "Batalha finalizada!";
+                _rank = (notif['rank_change'] as num).toInt();
+                _moedas = (notif['moedas_ganhas'] as num).toInt();
+              });
+            }
+          }
+        }
+      } catch (e) {
+        print("Polling error: $e");
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Color corStatus = Colors.blue;
+    IconData iconeStatus = Icons.hourglass_top;
+    String tituloTexto = _status;
+
+    if (_isWaiting) {
+      corStatus = Colors.orange;
+      tituloTexto = "Placar Salvo!";
+      iconeStatus = Icons.cloud_upload;
+    } else if (_status == "VITORIA") {
+      corStatus = Colors.green;
+      iconeStatus = Icons.emoji_events;
+    } else if (_status == "DERROTA") {
+      corStatus = Colors.red;
+      iconeStatus = Icons.mood_bad;
+    } else if (_status == "EMPATE") {
+      corStatus = Colors.grey;
+      iconeStatus = Icons.handshake;
+    }
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Column(
+        children: [
+          _isWaiting
+              ? const CircularProgressIndicator()
+              : Icon(iconeStatus, size: 60, color: corStatus),
+          const SizedBox(height: 10),
+          Text(
+            tituloTexto,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: corStatus,
+              fontWeight: FontWeight.bold,
+              fontSize: 22,
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _isWaiting
+                ? "Aguardando oponente terminar...\nVocê pode esperar aqui ou sair."
+                : _mensagem,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 16),
+          ),
+          if (!_isWaiting) ...[
+            const SizedBox(height: 20),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Column(
+                  children: [
+                    const Text(
+                      "Rank",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      _rank >= 0 ? "+$_rank" : "$_rank",
+                      style: TextStyle(
+                        color: _rank >= 0 ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
+                ),
+                Column(
+                  children: [
+                    const Text(
+                      "Moedas",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.monetization_on,
+                          color: Color(0xFF69F0AE),
+                          size: 18,
+                        ),
+                        Text(
+                          "+$_moedas",
+                          style: const TextStyle(
+                            color: Color(0xFF69F0AE),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+      actionsAlignment: MainAxisAlignment.center,
+      actions: [
+        ElevatedButton(
+          onPressed: widget.onClose, // <--- ISSO AGORA FECHA TUDO CERTO
+          style: ElevatedButton.styleFrom(
+            backgroundColor: corStatus,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: Text(
+            _isWaiting ? "SAIR AGORA" : "FECHAR",
             style: const TextStyle(color: Colors.white),
           ),
         ),

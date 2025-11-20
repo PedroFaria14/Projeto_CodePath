@@ -1,3 +1,10 @@
+// Arquivo: PaginaHome.dart (COMPLETO E ATUALIZADO)
+// - Placar de líderes
+// - Desafio Semanal
+// - Batalha (Ninho do Corvo)
+// - 🚀 RADAR DE NOTIFICAÇÕES AUTOMÁTICO
+
+import 'dart:async'; // Importante para o Timer
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -14,7 +21,7 @@ import 'batalha_page.dart';
 import 'resultado_dialog.dart';
 import 'convites_page.dart';
 import 'leaderboard_page.dart';
-import 'desafio_page.dart'; // Importa a página do desafio
+import 'desafio_page.dart';
 
 class PaginaHome extends StatefulWidget {
   const PaginaHome({super.key});
@@ -36,6 +43,7 @@ class _PaginaHomeState extends State<PaginaHome> {
   final String _baseUrl = "https://projeto-codepath.onrender.com";
 
   bool _isUserDataLoading = false;
+  Timer? _notificacaoTimer; // 🚀 O Radar!
 
   // --- (Mapas de Metadados) ---
   final Map<String, String> _cardDisplayNames = {
@@ -142,7 +150,6 @@ class _PaginaHomeState extends State<PaginaHome> {
     ],
   };
 
-  // --- (Getters de Cor) ---
   Color get _startColor {
     if (modulos.isEmpty) return _defaultInfo["gradient"][0];
     final startModuloIndex = _currentPage.floor();
@@ -189,7 +196,7 @@ class _PaginaHomeState extends State<PaginaHome> {
     };
   }
 
-  // --- (initState, didChangeDependencies, dispose) ---
+  // --- (initState, dispose) ---
   @override
   void initState() {
     super.initState();
@@ -203,6 +210,15 @@ class _PaginaHomeState extends State<PaginaHome> {
     });
 
     carregarModulos();
+
+    // 🚀 RADAR: Inicia o timer para checar notificações a cada 10 segundos
+    _notificacaoTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      // Só checa se tiver email e estiver na tela
+      if (_userEmail.isNotEmpty && mounted) {
+        _checarNotificacoes();
+        _carregarContagemConvites(_userEmail);
+      }
+    });
   }
 
   @override
@@ -217,6 +233,7 @@ class _PaginaHomeState extends State<PaginaHome> {
   @override
   void dispose() {
     _pageController.dispose();
+    _notificacaoTimer?.cancel(); // 🚀 Cancela o radar ao sair
     super.dispose();
   }
 
@@ -534,7 +551,7 @@ class _PaginaHomeState extends State<PaginaHome> {
               idConvite: null,
             ),
           ),
-        );
+        ).then((_) => carregarUsuarioEContadores()); // Recarrega ao voltar
       } else {
         final data = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -562,10 +579,10 @@ class _PaginaHomeState extends State<PaginaHome> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const AmigosPage()),
-    );
+    ).then((_) => carregarUsuarioEContadores()); // Recarrega ao voltar
   }
 
-  // --- (Funções de Notificação) ---
+  // --- (Funções de Notificação - ATUALIZADA PARA AUTOMÁTICO) ---
   Future<void> _carregarContagemConvites(String email) async {
     int total = 0;
     try {
@@ -601,6 +618,10 @@ class _PaginaHomeState extends State<PaginaHome> {
     if (_userEmail.isEmpty) return;
     if (!mounted) return;
 
+    // Verifica se já tem algum dialog aberto para não sobrepor
+    // (Truque simples: se o modalRoute não for o atual, talvez tenha um dialog)
+    // Mas para simplicidade, vamos confiar que o showDialog bloqueia a tela.
+
     try {
       final response = await http.get(
         Uri.parse("$_baseUrl/notificacoes/pendentes/$_userEmail"),
@@ -612,40 +633,54 @@ class _PaginaHomeState extends State<PaginaHome> {
       final List<Map<String, dynamic>> notificacoes = List.from(data);
 
       if (notificacoes.isEmpty) {
-        print("Nenhuma notificação pendente.");
         return;
       }
 
-      for (var notif in notificacoes) {
-        final String status = notif['titulo']?.toUpperCase() ?? "RESULTADO";
-        final String mensagem = notif['mensagem'] ?? "Batalha finalizada";
-        final int rankChange = (notif['rank_change'] as num? ?? 0).toInt();
-        final int moedasGanhas = (notif['moedas_ganhas'] as num? ?? 0).toInt();
-        final String notificacaoId = notif['id'];
+      // Pega a primeira notificação pendente e mostra
+      // Depois de mostrar, marcamos como lida para não repetir
 
-        if (!mounted) return;
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => ResultadoFinalDialog(
-            status: status,
-            mensagem: mensagem,
-            rankChange: rankChange,
-            moedasGanhas: moedasGanhas,
-            onClose: () {
-              Navigator.pop(ctx);
-              _marcarNotificacaoComoLida(notificacaoId);
+      final notif = notificacoes.first;
+      final String titulo = notif['titulo'] ?? "RESULTADO";
 
-              if (mounted) {
-                Provider.of<UserProvider>(
-                  context,
-                  listen: false,
-                ).applyBattleRewards(rankChange, moedasGanhas);
-              }
-            },
-          ),
-        );
+      // Define se é Vitoria/Derrota para o estilo
+      String statusParaDialog = "VITORIA"; // Default verde
+      if (titulo.toUpperCase().contains("PERDEU")) statusParaDialog = "DERROTA";
+      if (titulo.toUpperCase().contains("EMPATE")) statusParaDialog = "EMPATE";
+
+      final String mensagem = notif['mensagem'] ?? "Batalha finalizada";
+      final int rankChange = (notif['rank_change'] as num? ?? 0).toInt();
+      final int moedasGanhas = (notif['moedas_ganhas'] as num? ?? 0).toInt();
+      final String notificacaoId = notif['id'];
+
+      // Marca como lida ANTES de abrir o dialog para evitar loop se o timer rodar de novo
+      await _marcarNotificacaoComoLida(notificacaoId);
+
+      // Atualiza provider local
+      if (mounted) {
+        Provider.of<UserProvider>(
+          context,
+          listen: false,
+        ).applyBattleRewards(rankChange, moedasGanhas);
       }
+
+      if (!mounted) return;
+
+      // Mostra o Popup
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => ResultadoFinalDialog(
+          status: statusParaDialog,
+          mensagem: mensagem,
+          rankChange: rankChange,
+          moedasGanhas: moedasGanhas,
+          onClose: () {
+            Navigator.pop(ctx);
+            // Ao fechar, recarrega dados do usuário
+            carregarUsuarioEContadores();
+          },
+        ),
+      );
     } catch (e) {
       print("Erro ao checar notificações: $e");
     }
@@ -1126,7 +1161,7 @@ class _PaginaHomeState extends State<PaginaHome> {
                       const SizedBox(height: 20),
 
                       // ==========================================
-                      // 🚀 CARD DO DESAFIO SEMANAL (DESIGN ORIGINAL ATIVADO)
+                      // 🚀 CARD DO DESAFIO SEMANAL
                       // ==========================================
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -1207,7 +1242,7 @@ class _PaginaHomeState extends State<PaginaHome> {
                       const SizedBox(height: 12),
 
                       // ==========================================
-                      // 🚀 CARD DA ARENA (NINHO DO CORVO) ATUALIZADO
+                      // 🚀 CARD DA ARENA (NINHO DO CORVO)
                       // ==========================================
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -1289,11 +1324,11 @@ class _PaginaHomeState extends State<PaginaHome> {
 
                               // 7. A IMAGEM DO CORVO
                               Positioned(
-                                top: 15, // Ajuste aqui (para cima/baixo)
-                                right: 10, // Ajuste aqui (esquerda/direita)
+                                top: 0, // Ajuste aqui (para cima/baixo)
+                                right: 15, // Ajuste aqui (esquerda/direita)
                                 child: Image.asset(
-                                  'assets/imagens/Corvo.png',
-                                  height: 70,
+                                  'assets/imagens/Corvo.png', // <-- CONFIRME SE O CAMINHO ESTÁ CORRETO
+                                  height: 70, // Ajuste o tamanho do corvo
                                   fit: BoxFit.contain,
                                 ),
                               ),
