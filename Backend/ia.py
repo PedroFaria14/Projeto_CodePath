@@ -1,9 +1,14 @@
 import google.generativeai as genai
+import os
 import time
+from dotenv import load_dotenv
 #para rodar, basta fazer python3 ia.py no terminal e escolher a sua resposta
 #CUDAR COM LIMITE DO USO DA KEY DO GEMINI
-#USAR APENAS O NECESSARIO - QUALQUER COISA, CRIAR KEY DO GEMINI! 
-GEMINI_API_KEY = "***REMOVED***"
+#USAR APENAS O NECESSARIO - QUALQUER COISA, CRIAR KEY DO GEMINI!
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise ValueError(" Variável GEMINI_API_KEY não configurada no .env")
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-2.5-flash")
 
