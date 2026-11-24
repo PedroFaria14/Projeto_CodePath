@@ -1,7 +1,8 @@
 # Arquivo: pages/convite.py 
 # (ATUALIZADO com rank E weekly_score)
 
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Request
+from games import start_attempt
 from pydantic import BaseModel
 import datetime
 from firebase_config import db
@@ -106,7 +107,7 @@ async def criar_convite(payload: ConviteCreateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/convite/iniciar/{id_convite}/{email_jogador}", response_model=ConviteIniciarrResponse, tags=["Convite de Amigo"])
-async def iniciar_convite(id_convite: str, email_jogador: str):
+async def iniciar_convite(id_convite: str, email_jogador: str, request: Request):
     try:
         convite_ref = db.collection("batalhas_convite").document(id_convite)
         convite_doc = convite_ref.get()
@@ -115,14 +116,17 @@ async def iniciar_convite(id_convite: str, email_jogador: str):
         convite_data = convite_doc.to_dict()
         perguntas = await get_perguntas_aleatorias(convite_data.get("nivel", "iniciante"), 10)
         return ConviteIniciarrResponse(
-            perguntas=perguntas,
+            perguntas=start_attempt(db, request.state.identity.user_id, email_jogador, 'invite',
+                                    perguntas, {'invite_id': id_convite}),
             id_convite=id_convite
         )
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"❌ Erro ao iniciar convite: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/convite/finalizar", tags=["Convite de Amigo"])
+# Implementação legada preservada para referência; a rota ativa está em games.py.
 async def finalizar_convite_rodada(payload: ConviteFinalizarRequest):
     try:
         convite_ref = db.collection("batalhas_convite").document(payload.id_convite)
@@ -289,7 +293,10 @@ async def get_convites_pendentes(email_jogador: str):
         docs_pendentes = query.stream()
         lista_convites = []
         for doc in docs_pendentes:
-            convite_data = doc.to_dict()
+            convite_data = {key: value for key, value in doc.to_dict().items() if key in {
+                'email_desafiante', 'email_desafiado', 'nivel', 'status', 'timestamp_criacao',
+                'pontuacao_desafiante', 'pontuacao_desafiado', 'vencedor',
+            }}
             convite_data["id_convite"] = doc.id
             lista_convites.append(convite_data)
         return {"success": True, "convites": lista_convites}

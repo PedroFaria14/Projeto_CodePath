@@ -115,7 +115,7 @@ class _TrilhaUmState extends State<TrilhaUm> {
 
     print("TrilhaUm: Retornou da QuestaoPage. Resultado: $resultado"); // Log
 
-    if (resultado != null && resultado is List && mounted) {
+    if (resultado != null && mounted) {
       print(
         "TrilhaUm: QuestaoPage retornou fases atualizadas. Atualizando estado.",
       ); // Log
@@ -247,7 +247,6 @@ class _TrilhaUmState extends State<TrilhaUm> {
                   );
                 }
 
-                final double iconSize = isCurrent ? 60.0 : 45.0;
                 final double clickableSize = 70.0;
                 final leftPos =
                     constraints.maxWidth * pos.dx - (clickableSize / 2);

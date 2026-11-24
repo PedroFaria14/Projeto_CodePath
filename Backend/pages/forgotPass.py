@@ -12,7 +12,10 @@ import secrets # Para gerar tokens seguros
 import os
 from dotenv import load_dotenv
 import bcrypt # Para o hash da nova senha
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from passwords import validate_new_password
+from security import token_digest
+from google.cloud import firestore
 
 # Carrega variáveis do arquivo .env
 load_dotenv()
@@ -29,8 +32,10 @@ class PasswordResetRequest(BaseModel):
 
 class ResetPasswordPayload(BaseModel):
     email: EmailStr
-    token: str
-    new_password: str
+    token: str = Field(pattern=r"^\d{6}$")
+    new_password: str = Field(min_length=8, max_length=72)
+
+    _validate_password = field_validator("new_password")(validate_new_password)
 
 class ApiResponse(BaseModel):
     success: bool
@@ -121,10 +126,10 @@ async def request_password_reset(
         expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
 
         # 3. Armazenar token no Firestore (Sem alterações)
-        token_ref = db.collection('password_reset_tokens').document()
+        token_ref = db.collection('password_reset_tokens').document(token_digest(user_email))
         token_ref.set({
             'email': user_email,
-            'token': token,
+            'token_hash': token_digest(token),
             'expires_at': expires_at,
             'created_at': datetime.datetime.utcnow(),
             'used': False
@@ -176,15 +181,12 @@ async def reset_password(payload: ResetPasswordPayload = Body(...)):
     """
     try:
         # 1. Buscar o token no banco de dados
-        tokens_ref = db.collection('password_reset_tokens')
-        query = tokens_ref.where('email', '==', payload.email)\
-                          .where('token', '==', payload.token)\
-                          .where('used', '==', False)\
-                          .limit(1).stream()
-        
-        token_doc = next(query, None) 
+        token_ref = db.collection('password_reset_tokens').document(token_digest(payload.email))
+        token_doc = token_ref.get()
 
-        if not token_doc:
+        if not token_doc.exists or not secrets.compare_digest(
+            token_doc.to_dict().get('token_hash', ''), token_digest(payload.token)
+        ):
             raise HTTPException(status_code=400, detail="Código inválido ou não encontrado.")
 
         # 2. Verificar se o token expirou
@@ -209,13 +211,21 @@ async def reset_password(payload: ResetPasswordPayload = Body(...)):
         new_password_hash = hash_password(payload.new_password)
 
         # 5. Atualizar a senha do usuário no Firestore
-        user_doc.reference.update({
-            'senha_hash': new_password_hash 
-        })
-
-        # 6. Invalidar o token (agora deletando)
-        token_doc.reference.delete()
-        print(f"Token {payload.token} para {payload.email} excluído com sucesso.") # Log opcional
+        @firestore.transactional
+        def consume_token(transaction):
+            fresh = token_ref.get(transaction=transaction)
+            fresh_user = user_doc.reference.get(transaction=transaction)
+            if not fresh_user.exists:
+                raise HTTPException(404, "Usuário não encontrado.")
+            if not fresh.exists or fresh.to_dict() != token_data:
+                raise HTTPException(400, "Código já utilizado ou substituído.")
+            if datetime.datetime.now(datetime.timezone.utc) > expires_at:
+                raise HTTPException(400, "Código expirado. Solicite um novo.")
+            transaction.update(user_doc.reference, {
+                'senha_hash': new_password_hash, 'senha': firestore.DELETE_FIELD,
+            })
+            transaction.delete(token_ref)
+        consume_token(db.transaction())
 
         return {"success": True, "message": "Senha redefinida com sucesso!"}
 

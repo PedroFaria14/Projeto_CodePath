@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:codepath/core/app_config.dart';
+import 'package:codepath/core/api_http.dart' as api;
+import 'package:codepath/core/session_store.dart';
+import 'package:codepath/providers/user_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'delete_account_page.dart';
 import 'login.dart';
 
 class ConfiguracoesPage extends StatefulWidget {
@@ -10,21 +17,42 @@ class ConfiguracoesPage extends StatefulWidget {
 }
 
 class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
-  // Mantém o estado das configurações
-  bool modoEscuro = false; // Funcionalidade ainda não implementada
-  bool notificacoes = true;
-  bool somAtivo = true;
-
   Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    try {
+      await api.post(Uri.parse('${AppConfig.apiBaseUrl}/logout'));
+    } catch (_) {
+      // A saída local não depende da disponibilidade da API.
+    }
+    await SessionStore.clear();
 
     if (!mounted) return;
+    context.read<UserProvider>().reset();
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const Login()),
       (route) => false,
     );
+  }
+
+  Future<void> _open(Uri uri) async {
+    try {
+      if (uri.toString().isEmpty || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        throw StateError('Destino indisponível');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Não foi possível abrir o link. Tente novamente.'),
+      ));
+    }
+  }
+
+  Future<void> _about() async {
+    final info = await PackageInfo.fromPlatform();
+    if (!mounted) return;
+    showAboutDialog(context: context, applicationName: 'CodePath',
+      applicationVersion: '${info.version} (${info.buildNumber})',
+      children: [const Text('Aprenda lógica de programação com trilhas e desafios.')]);
   }
 
   @override
@@ -65,53 +93,6 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
               vertical: 20.0,
             ),
             children: [
-              // 🔹 Card flutuante para as opções principais
-              _buildModernCard(
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Preferências",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2E2E2E),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    // Opção Modo Escuro
-                    _buildSwitchOption(
-                      title: "Modo escuro",
-                      subtitle: "Ativa o tema noturno (em breve)",
-                      icon: Icons.dark_mode_outlined,
-                      value: modoEscuro,
-                      onChanged: null, // Desabilitado por enquanto
-                      // onChanged: (value) => setState(() => modoEscuro = value),
-                    ),
-                    const Divider(height: 1, indent: 50), // Separador
-                    // Opção Notificações
-                    _buildSwitchOption(
-                      title: "Notificações",
-                      subtitle: "Receber lembretes e dicas",
-                      icon: Icons.notifications_outlined,
-                      value: notificacoes,
-                      onChanged: (value) =>
-                          setState(() => notificacoes = value),
-                    ),
-                    const Divider(height: 1, indent: 50),
-                    // Opção Sons
-                    _buildSwitchOption(
-                      title: "Som e vibração",
-                      subtitle: "Ativa efeitos sonoros do app",
-                      icon: Icons.volume_up_outlined,
-                      value: somAtivo,
-                      onChanged: (value) => setState(() => somAtivo = value),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24), // Espaço entre os cards
               // 🔹 Card flutuante para Informações e Suporte
               _buildModernCard(
                 Column(
@@ -129,9 +110,9 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
                     // Opção Versão
                     _buildInfoOption(
                       title: "Versão do app",
-                      subtitle: "1.0.0 (Beta)",
+                      subtitle: "Informações e licenças",
                       icon: Icons.info_outline,
-                      onTap: () {}, // Nenhuma ação por enquanto
+                      onTap: _about,
                     ),
                     const Divider(height: 1, indent: 50),
                     // Opção Suporte
@@ -139,26 +120,23 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
                       title: "Ajuda e Suporte",
                       subtitle: "Entre em contato conosco",
                       icon: Icons.help_outline,
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Função em desenvolvimento..."),
-                          ),
-                        );
-                      },
+                      onTap: () => _open(Uri(scheme: 'mailto', path: AppConfig.supportEmail,
+                        queryParameters: {'subject': 'Suporte CodePath'})),
                     ),
                     const Divider(height: 1, indent: 50),
                     // Opção Política
                     _buildInfoOption(
                       title: "Política de Privacidade",
                       icon: Icons.privacy_tip_outlined,
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Página de política em breve..."),
-                          ),
-                        );
-                      },
+                      onTap: () => _open(Uri.parse(AppConfig.privacyUrl)),
+                    ),
+                    const Divider(height: 1, indent: 50),
+                    _buildInfoOption(
+                      title: 'Excluir conta e dados',
+                      subtitle: 'Exclusão permanente com confirmação de senha',
+                      icon: Icons.delete_forever_outlined,
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const DeleteAccountPage())),
                     ),
                   ],
                 ),
@@ -216,38 +194,6 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
         ],
       ),
       child: child,
-    );
-  }
-
-  // Widget para opções com Switch
-  Widget _buildSwitchOption({
-    required String title,
-    String? subtitle,
-    required IconData icon,
-    required bool value,
-    required ValueChanged<bool>? onChanged, // Permite desabilitar
-  }) {
-    return SwitchListTile(
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontWeight: FontWeight.w500,
-          color: Color(0xFF2E2E2E),
-        ),
-      ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle,
-              style: const TextStyle(color: Colors.black54, fontSize: 13),
-            )
-          : null,
-      secondary: Icon(icon, color: Colors.black54), // Ícone à esquerda
-      activeColor: const Color(0xFF3CB371), // Cor verde quando ativo
-      value: value,
-      onChanged: onChanged, // Usa o callback passado
-      contentPadding: const EdgeInsets.symmetric(
-        vertical: 4,
-      ), // Ajusta padding vertical
     );
   }
 

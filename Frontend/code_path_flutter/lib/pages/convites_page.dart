@@ -3,7 +3,8 @@
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // 👇 IMPORTA A TELA DE BATALHA 👇
@@ -22,8 +23,7 @@ class _ConvitesPageState extends State<ConvitesPage> {
   bool _carregando = true;
 
   String _userEmail = "";
-  String _userNivel = "iniciante";
-  final String _baseUrl = "https://projeto-codepath.onrender.com";
+  final String _baseUrl = AppConfig.apiBaseUrl;
 
   @override
   void initState() {
@@ -36,7 +36,7 @@ class _ConvitesPageState extends State<ConvitesPage> {
 
     final prefs = await SharedPreferences.getInstance();
     _userEmail = prefs.getString("userEmail") ?? "";
-    _userNivel = prefs.getString("userNivel") ?? "iniciante";
+    if (!mounted) return;
 
     if (_userEmail.isEmpty) {
       if (mounted) {

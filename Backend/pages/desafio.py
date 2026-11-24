@@ -1,6 +1,7 @@
 # Arquivo: pages/desafio.py (Com 3 TENTATIVAS e nova estrutura 3-4-3)
 
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Request
+from games import start_attempt, week_key
 from pydantic import BaseModel
 import datetime
 from firebase_config import db
@@ -95,12 +96,12 @@ async def get_perguntas_fase1(modulo: str, count: int) -> List[Dict[str, Any]]:
 # --- Fim das Funções Auxiliares ---
 
 @router.post("/desafio/iniciar", tags=["Desafio Semanal"])
-async def iniciar_desafio(payload: DesafioRequest):
+async def iniciar_desafio(payload: DesafioRequest, request: Request):
     """
     Verifica se o usuário já jogou (limite de 3 vezes) e retorna as 10 perguntas (3-4-3).
     """
     try:
-        semana_atual = get_semana_atual()
+        semana_atual = week_key()
         modulo_da_semana = MODULO_DA_SEMANA 
         
         # 1. Verifica se o usuário já jogou (LÓGICA ATUALIZADA)
@@ -115,14 +116,7 @@ async def iniciar_desafio(payload: DesafioRequest):
 
         if semana_registrada != semana_atual:
             print(f"Nova semana detectada para {payload.email}. Resetando contador.")
-            user_doc.reference.update({
-                "desafio_week": semana_atual,
-                "desafio_plays": 0
-            })
             plays_atuais = 0 
-        
-        if plays_atuais >= LIMITE_TENTATIVAS_SEMANA:
-            raise HTTPException(status_code=403, detail=f"Você já usou suas {plays_atuais}/{LIMITE_TENTATIVAS_SEMANA} tentativas desta semana!")
         
         print(f"Usuário {payload.email} iniciando tentativa {plays_atuais + 1} de {LIMITE_TENTATIVAS_SEMANA}.")
 
@@ -170,12 +164,14 @@ async def iniciar_desafio(payload: DesafioRequest):
         for p in perguntas_fase3: p['fase'] = 3
         
         todas_perguntas = perguntas_fase1 + perguntas_fase2 + perguntas_fase3
+        public = start_attempt(db, request.state.identity.user_id, payload.email,
+                               'weekly', todas_perguntas)
         
         return {
             "success": True, 
-            "perguntas": todas_perguntas, 
+            "perguntas": public,
             "modulo": modulo_da_semana,
-            "tentativa_atual": plays_atuais + 1,
+            "tentativa_atual": user_doc.reference.get().to_dict().get('desafio_plays', 1),
             "tentativas_max": LIMITE_TENTATIVAS_SEMANA
         }
 
@@ -186,7 +182,7 @@ async def iniciar_desafio(payload: DesafioRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/desafio/finalizar", tags=["Desafio Semanal"])
+# Implementação legada preservada para referência; a rota ativa está em games.py.
 async def finalizar_desafio(payload: DesafioFinalizarRequest):
     """
     Recebe a pontuação (de 10), calcula recompensas e INCREMENTA o contador.

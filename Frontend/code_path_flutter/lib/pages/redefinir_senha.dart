@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'login.dart'; // Para voltar ao login no final
 
 class RedefinirSenhaPage extends StatefulWidget {
@@ -21,6 +22,7 @@ class _RedefinirSenhaPageState extends State<RedefinirSenhaPage> {
   bool _confirmarSenhaVisivel = false;
 
   Future<void> _redefinirSenha() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -32,7 +34,7 @@ class _RedefinirSenhaPageState extends State<RedefinirSenhaPage> {
     try {
       // Chama o endpoint do Python para SALVAR a nova senha
       final response = await http.post(
-        Uri.parse("https://projeto-codepath.onrender.com/reset-password"),
+        Uri.parse("${AppConfig.apiBaseUrl}/reset-password"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "email": widget.email,
@@ -42,9 +44,7 @@ class _RedefinirSenhaPageState extends State<RedefinirSenhaPage> {
       );
 
       if (!mounted) return;
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && data["success"] == true) {
+      if (response.statusCode == 200 && jsonDecode(response.body)["success"] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Senha redefinida com sucesso!"),
@@ -61,7 +61,7 @@ class _RedefinirSenhaPageState extends State<RedefinirSenhaPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              data["detail"] ?? "Erro ao redefinir senha. Código inválido?",
+              http.errorMessage(response, 'Não foi possível redefinir a senha.'),
             ),
             backgroundColor: Colors.red,
           ),
@@ -71,7 +71,7 @@ class _RedefinirSenhaPageState extends State<RedefinirSenhaPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Erro de conexão: $e"),
+          content: Text(e is http.ApiException ? e.message : 'Não foi possível redefinir. Tente novamente.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -180,8 +180,8 @@ class _RedefinirSenhaPageState extends State<RedefinirSenhaPage> {
                               if (value == null || value.isEmpty) {
                                 return "Insira uma nova senha";
                               }
-                              if (value.length < 6) {
-                                return "A senha deve ter no mínimo 6 caracteres";
+                              if (value.length < 8 || utf8.encode(value).length > 72) {
+                                return 'Use ao menos 8 caracteres e no máximo 72 bytes.';
                               }
                               return null;
                             },

@@ -3,7 +3,8 @@
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'amigos_busca_page.dart'; // A tela de busca
 
@@ -18,7 +19,7 @@ class _AmigosAdicionarHubPageState extends State<AmigosAdicionarHubPage> {
   List<Map<String, dynamic>> _sugestoes = [];
   bool _carregandoSugestoes = true;
   String _userEmail = "";
-  final String _baseUrl = "https://projeto-codepath.onrender.com";
+  final String _baseUrl = AppConfig.apiBaseUrl;
 
   @override
   void initState() {

@@ -3,7 +3,8 @@
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'amigos_adicionar_hub_page.dart'; // A tela de adicionar (Imagem 1)
 
@@ -23,7 +24,7 @@ class _AmigosListaPageState extends State<AmigosListaPage> {
 
   String _userEmail = "";
   String _userNivel = "iniciante";
-  final String _baseUrl = "https://projeto-codepath.onrender.com";
+  final String _baseUrl = AppConfig.apiBaseUrl;
 
   @override
   void initState() {
@@ -134,7 +135,7 @@ class _AmigosListaPageState extends State<AmigosListaPage> {
   }
 
   Future<void> _desafiarAmigo(String emailAmigo, String nomeAmigo) async {
-    print("Desafiando $nomeAmigo ($emailAmigo)");
+    debugPrint('Enviando convite de batalha.');
 
     try {
       final response = await http.post(

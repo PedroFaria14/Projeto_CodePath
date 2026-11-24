@@ -1,7 +1,8 @@
 import 'package:codepath/pages/cadastro.dart';
 import 'package:flutter/material.dart';
 import 'login.dart';
-import 'trilhaUm.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:codepath/core/app_config.dart';
 
 class TelaInicial extends StatelessWidget {
   const TelaInicial({super.key});
@@ -10,6 +11,7 @@ class TelaInicial extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
+        width: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -18,8 +20,10 @@ class TelaInicial extends StatelessWidget {
             colors: [Color(0xFFE0F8E0), Color(0xFFB2F7C1), Color(0xFF90EE90)],
           ),
         ),
-        child: Center(
-          child: Padding(
+        child: SafeArea(child: Center(
+          child: SingleChildScrollView(child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -38,7 +42,7 @@ class TelaInicial extends StatelessWidget {
 
                 const SizedBox(height: 8),
                 const Text(
-                  "Aprenda lógica para programação \n de graça!! Agora!",
+                  "Aprenda lógica de programação,\num desafio de cada vez.",
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16, color: Colors.black),
                 ),
@@ -88,6 +92,24 @@ class TelaInicial extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (AppConfig.privacyUrl.isNotEmpty) TextButton(
+                  onPressed: () async {
+                    try {
+                      final opened = await launchUrl(Uri.parse(AppConfig.privacyUrl),
+                          mode: LaunchMode.externalApplication);
+                      if (!opened && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Não foi possível abrir a política. Tente novamente.')));
+                      }
+                    } catch (_) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Não foi possível abrir a política. Tente novamente.')));
+                      }
+                    }
+                  },
+                  child: const Text('Política de privacidade'),
+                ),
 
                 const SizedBox(height: 16),
 
@@ -133,8 +155,8 @@ class TelaInicial extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ),
+          ))),
+        )),
       ),
     );
   }

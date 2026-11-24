@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, field_validator
+from passwords import validate_new_password
 import datetime
 import re
 from firebase_config import db
@@ -11,9 +12,11 @@ router = APIRouter()
 class UserRegister(BaseModel):
     nome: str = Field(..., min_length=2)
     email: EmailStr
-    senha: str = Field(..., min_length=6)
+    senha: str = Field(..., min_length=8, max_length=72)
     data_nascimento: datetime.date = Field(...)
     telefone: str = Field(..., min_length=10, max_length=17)
+
+    _validate_password = field_validator("senha")(validate_new_password)
 
 class ApiResponse(BaseModel):
     success: bool

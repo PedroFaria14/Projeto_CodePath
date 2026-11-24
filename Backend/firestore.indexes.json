@@ -1,0 +1,60 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "batalha_queue",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "schema_version", "order": "ASCENDING" },
+        { "fieldPath": "rank_score_jogador", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notificacoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "email", "order": "ASCENDING" },
+        { "fieldPath": "lido", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "batalhas_convite",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "email_desafiado", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "amizades",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "receptor_email", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "amizades",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "solicitante_email", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "amizades",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "solicitante_email", "order": "ASCENDING" },
+        { "fieldPath": "receptor_email", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    { "collectionGroup": "sessions", "fieldPath": "expires_at", "ttl": true, "indexes": [] },
+    { "collectionGroup": "auth_limits", "fieldPath": "expires_at", "ttl": true, "indexes": [] },
+    { "collectionGroup": "password_reset_tokens", "fieldPath": "expires_at", "ttl": true, "indexes": [] },
+    { "collectionGroup": "deletion_receipts", "fieldPath": "expires_at", "ttl": true, "indexes": [] }
+  ]
+}

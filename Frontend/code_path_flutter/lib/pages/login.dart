@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
+import 'package:codepath/core/session_store.dart';
 import 'cadastro.dart';
 import 'home.dart'; // Pressupondo que PaginaHome está no arquivo home.dart
 import 'esqueci_senha.dart'; // 🚀 IMPORTAÇÃO ADICIONADA
@@ -56,29 +57,41 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
   // 🚀 REMOVIDO: A função _showDevelopmentAlert foi removida.
 
   Future<void> loginUser() async {
+    if (isLoading) return;
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(emailController.text.trim()) ||
+        senhaController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Informe um e-mail válido e sua senha.')),
+      );
+      return;
+    }
     setState(() => isLoading = true);
 
     try {
       final url = Uri.parse(
-        "https://projeto-codepath.onrender.com/login",
+        "${AppConfig.apiBaseUrl}/login",
       ); // localhost no Windows
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "email": emailController.text.trim(),
-          "senha": senhaController.text.trim(),
+          "senha": senhaController.text,
         }),
       );
 
       // Verificação de 'mounted' antes de usar 'context'
       if (!mounted) return;
 
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && data["success"] == true) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString("userEmail", emailController.text.trim());
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final token = data['access_token'];
+        if (data['success'] != true || token is! String || token.isEmpty) {
+          throw const http.ApiException('Não foi possível iniciar a sessão. Tente novamente.');
+        }
+        final email = data['user']?['email'] as String? ?? emailController.text.trim();
+        await SessionStore.save(token, email);
+        if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Login realizado com sucesso!")),
@@ -91,7 +104,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data["message"] ?? "Erro no login")),
+          SnackBar(content: Text(http.errorMessage(response, 'Não foi possível entrar. Tente novamente.'))),
         );
       }
     } catch (e) {
@@ -99,7 +112,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("Erro de conexão: $e")));
+      ).showSnackBar(SnackBar(content: Text(e is http.ApiException ? e.message : 'Não foi possível entrar. Tente novamente.')));
     }
 
     // Verificação de 'mounted'

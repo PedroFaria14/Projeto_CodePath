@@ -3,7 +3,12 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock 
 
 # Isso está correto, pois seu test_main.py funcionou
-from main import app 
+from fastapi import FastAPI
+from pages.home import router
+
+# Teste do contrato do handler; autenticação/IDOR são testados em tests/test_security.py.
+app = FastAPI()
+app.include_router(router)
 
 client = TestClient(app)
 
@@ -12,7 +17,7 @@ client = TestClient(app)
 # ---
 
 # CORRIGIDO AQUI (pages.profile.db)
-@patch('firebase_config.db') 
+@patch('pages.home.db')
 def test_get_profile_sucesso(mock_db):
     """Testa se o perfil é encontrado e a senha é removida."""
     
@@ -20,7 +25,8 @@ def test_get_profile_sucesso(mock_db):
     dados_falsos_do_banco = {
         'nome': 'Usuario Teste',
         'email': 'teste@exemplo.com',
-        'senha': 'senhaSuperSeScreta123' 
+        'senha': 'senhaSuperSeScreta123',
+        'senha_hash': 'hash-que-nao-pode-sair-na-resposta',
     }
     
     doc_falso = MagicMock()
@@ -40,13 +46,14 @@ def test_get_profile_sucesso(mock_db):
     assert data['message'] == "Perfil encontrado."
     assert data['user']['email'] == 'teste@exemplo.com'
     assert 'senha' not in data['user']
+    assert 'senha_hash' not in data['user']
 
 # ---
 # CENÁRIO 2: NÃO ENCONTRADO (HTTP 404)
 # ---
 
 # CORRIGIDO AQUI (pages.profile.db) E NO NOME DA FUNÇÃO
-@patch('firebase_config.db') 
+@patch('pages.home.db')
 def test_get_profile_nao_encontrado(mock_db):
     """Testa o que acontece se o usuário não existir (query vazia)."""
     
@@ -65,7 +72,7 @@ def test_get_profile_nao_encontrado(mock_db):
 # ---
 
 # CORRIGIDO AQUI (pages.profile.db)
-@patch('firebase_config.db', None) 
+@patch('pages.home.db', None)
 def test_get_profile_sem_conexao_db():
     """Testa a primeira verificação: 'if not db:'."""
     
@@ -83,7 +90,7 @@ def test_get_profile_sem_conexao_db():
 # ---
 
 # CORRIGIDO AQUI (pages.profile.db)
-@patch('firebase_config.db')
+@patch('pages.home.db')
 def test_get_profile_erro_geral(mock_db):
     """Testa o bloco try/except, simulando uma falha no Firestore."""
     
@@ -95,5 +102,5 @@ def test_get_profile_erro_geral(mock_db):
     
     # 3. VERIFICAÇÃO
     assert response.status_code == 500
-    assert "Ocorreu um erro ao buscar o perfil" in response.json()['detail']
-    assert "Falha no satélite" in response.json()['detail']
+    assert response.json()['detail'] == 'Não foi possível carregar o perfil.'
+    assert 'Falha no satélite' not in response.text

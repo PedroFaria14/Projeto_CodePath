@@ -1,6 +1,7 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
+from security import protect_request
 from pydantic import BaseModel, Field
 import datetime
 import os
@@ -23,12 +24,15 @@ from pages.battles import router as desafio_batalha
 from pages.convite import router as convite_router
 from pages.friends import router as friends_router
 from pages.desafio import router as desafio_router
+from pages.account import router as account_router
+from games import router as games_router
 
 
 PORT = 8000
 
 
-app = FastAPI(title="CodePath API", description="API para o aplicativo CodePath.")
+app = FastAPI(title="CodePath API", description="API para o aplicativo CodePath.",
+              dependencies=[Depends(protect_request)])
 
 
 origins = [
@@ -60,6 +64,8 @@ app.include_router(update_nivel_router)
 app.include_router(home_router)
 app.include_router(leasson_router)
 app.include_router(profile_router)
+app.include_router(account_router)
+app.include_router(games_router)
 app.include_router(progress)
 app.include_router(forgotPass.router, tags=["Password Reset"])
 app.include_router(desafio_batalha)

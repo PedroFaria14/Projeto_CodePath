@@ -1,7 +1,8 @@
 // Arquivo: lib/providers/user_provider.dart (COMPLETO E CORRIGIDO)
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'dart:convert';
 
 class UserProvider with ChangeNotifier {
@@ -12,6 +13,7 @@ class UserProvider with ChangeNotifier {
   int _moedas = 0;
   int _streak = 0;
   bool _isLoading = true;
+  int _generation = 0;
 
   String _nivel = "iniciante";
   String _telefone = "-";
@@ -31,6 +33,7 @@ class UserProvider with ChangeNotifier {
 
   // Função para carregar os dados
   Future<void> loadUserData(String userEmail) async {
+    final generation = ++_generation;
     _isLoading = true;
     _email = userEmail;
     // Não notifica os listeners aqui para evitar piscar a tela
@@ -38,8 +41,9 @@ class UserProvider with ChangeNotifier {
 
     try {
       final response = await http.get(
-        Uri.parse("https://projeto-codepath.onrender.com/profile/$_email"),
+        Uri.parse("${AppConfig.apiBaseUrl}/profile/${Uri.encodeComponent(_email)}"),
       );
+      if (generation != _generation) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)["user"];
         _nome = data["nome"] ?? "Usuário";
@@ -54,6 +58,7 @@ class UserProvider with ChangeNotifier {
         _nome = "Erro ao carregar";
       }
     } catch (e) {
+      if (generation != _generation) return;
       print("Erro no UserProvider: $e");
       _nome = "Erro de conexão";
     }
@@ -74,6 +79,20 @@ class UserProvider with ChangeNotifier {
   // 🚀 FUNÇÃO NOVA ADICIONADA
   // Chamada pelo PaginaHome se o usuário não estiver logado ou der erro
   void stopLoading() {
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  void reset() {
+    _generation++;
+    _nome = 'Usuário';
+    _email = '';
+    _rank = 1000;
+    _moedas = 0;
+    _streak = 0;
+    _nivel = 'iniciante';
+    _telefone = '-';
+    _dataNascimento = '-';
     _isLoading = false;
     notifyListeners();
   }

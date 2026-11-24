@@ -4,7 +4,8 @@
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AmigosBuscaPage extends StatefulWidget {
@@ -23,7 +24,7 @@ class _AmigosBuscaPageState extends State<AmigosBuscaPage> {
   bool _mostrandoSugestoesIniciais =
       true; // Novo flag para controlar o que mostrar
 
-  final String _baseUrl = "https://projeto-codepath.onrender.com";
+  final String _baseUrl = AppConfig.apiBaseUrl;
 
   @override
   void initState() {

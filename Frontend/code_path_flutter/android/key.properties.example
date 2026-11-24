@@ -1,0 +1,6 @@
+# Copie para key.properties (ignorado pelo Git). Nunca versione sua chave/senhas.
+# Caminho relativo à pasta android, ou absoluto usando barras / no Windows.
+storeFile=upload-keystore.jks
+storePassword=
+keyAlias=upload
+keyPassword=

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'redefinir_senha.dart'; // Importa a próxima tela (Passo 2)
 
 class EsqueciSenhaPage extends StatefulWidget {
@@ -26,7 +27,7 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
       // Chama o endpoint do Python para PEDIR o código
       final response = await http.post(
         Uri.parse(
-          "https://projeto-codepath.onrender.com/request-password-reset",
+          "${AppConfig.apiBaseUrl}/request-password-reset",
         ),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"email": _emailController.text.trim()}),

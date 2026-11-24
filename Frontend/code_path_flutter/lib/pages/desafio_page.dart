@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:codepath/providers/user_provider.dart';
-import 'package:collection/collection.dart'; // 🚀 1. NOVA IMPORTAÇÃO
 import 'resultado_dialog.dart';
 
 class DesafioPage extends StatefulWidget {
@@ -24,6 +24,10 @@ class _DesafioPageState extends State<DesafioPage> {
   int acertos = 0;
   bool carregando = true;
   bool respostaEnviada = false;
+  bool _finalizando = false;
+  bool _finalizado = false;
+  DateTime? _deadline;
+  bool _started = false;
 
   // Variáveis da Fase 1 (Múltipla Escolha)
   int? alternativaSelecionada;
@@ -41,12 +45,14 @@ class _DesafioPageState extends State<DesafioPage> {
   int _segundosRestantes = 120;
 
   String _userEmail = "";
-  final String _baseUrl = "https://projeto-codepath.onrender.com";
+  final String _baseUrl = AppConfig.apiBaseUrl;
 
   @override
   void initState() {
     super.initState();
-    _iniciarDesafio();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _mostrarRegras();
+    });
   }
 
   @override
@@ -60,6 +66,7 @@ class _DesafioPageState extends State<DesafioPage> {
   Future<void> _iniciarDesafio() async {
     final prefs = await SharedPreferences.getInstance();
     _userEmail = prefs.getString("userEmail") ?? "";
+    if (!mounted) return;
     if (_userEmail.isEmpty) {
       if (mounted) Navigator.of(context).pop();
       return;
@@ -89,7 +96,7 @@ class _DesafioPageState extends State<DesafioPage> {
         _loadCurrentQuestion();
 
         // 🚀 MUDANÇA AQUI: Não inicia o timer direto. Mostra as regras antes.
-        _mostrarRegras();
+        await _iniciarTimer();
       } else {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -100,7 +107,8 @@ class _DesafioPageState extends State<DesafioPage> {
         );
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      Navigator.pop(context);
       print("Erro ao iniciar desafio: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -116,6 +124,7 @@ class _DesafioPageState extends State<DesafioPage> {
       context: context,
       barrierDismissible: false, // O usuário é obrigado a escolher uma opção
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Column(
           children: [
@@ -172,7 +181,7 @@ class _DesafioPageState extends State<DesafioPage> {
             ),
             const ListTile(
               leading: Icon(Icons.timer, color: Colors.blue),
-              title: Text("Você tem 2 minutos no total."),
+              title: Text('Você tem 2 minutos a partir da liberação das questões. O tempo não pausa ao sair.'),
               dense: true,
               contentPadding: EdgeInsets.zero,
             ),
@@ -217,7 +226,7 @@ class _DesafioPageState extends State<DesafioPage> {
             ),
             onPressed: () {
               Navigator.pop(ctx); // Fecha o diálogo
-              _iniciarTimer(); // Começa o jogo
+              _iniciarDesafio();
             },
             child: const Text(
               "COMEÇAR",
@@ -229,12 +238,40 @@ class _DesafioPageState extends State<DesafioPage> {
     );
   }
 
-  void _iniciarTimer() {
+  Future<void> _iniciarTimer() async {
+    try {
+      final response = await http.post(Uri.parse('$_baseUrl/game/start'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'attempt_id': quizQuestions.first['attempt_id']}));
+      if (!mounted || _finalizando || _finalizado) return;
+      if (response.statusCode != 200) {
+        throw http.ApiException(http.errorMessage(response, 'Não foi possível iniciar o desafio.'));
+      }
+      final data = jsonDecode(response.body);
+      _deadline = DateTime.parse(data['deadline'] as String);
+      setState(() {
+        currentQuestionIndex = (data['next_index'] as num).toInt();
+        acertos = (data['score'] as num).toInt();
+        _segundosRestantes = _deadline!.difference(DateTime.now()).inSeconds.clamp(0, _tempoTotalBatalha);
+        _started = true;
+      });
+      _loadCurrentQuestion();
+      if (_finalizando || _finalizado) return;
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error is http.ApiException ? error.message : 'Não foi possível iniciar o desafio.'),
+        action: SnackBarAction(label: 'Tentar novamente', onPressed: _iniciarTimer),
+      ));
+      return;
+    }
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_segundosRestantes > 0) {
+      final remaining = _deadline!.difference(DateTime.now()).inSeconds.clamp(0, _tempoTotalBatalha);
+      if (remaining > 0) {
         if (mounted) {
           setState(() {
-            _segundosRestantes--;
+            _segundosRestantes = remaining;
           });
         }
       } else {
@@ -285,38 +322,33 @@ class _DesafioPageState extends State<DesafioPage> {
   }
 
   // 🚀 4. ATUALIZADO: Lógica de validação (compara listas na Fase 3)
-  void _handleAnswer(dynamic respostaUsuario, dynamic respostaCorretaEsperada) {
-    if (respostaEnviada) return;
-
-    final bool correta;
-
-    if (respostaUsuario is int) {
-      // Fase 1: Múltipla Escolha (resposta é o índice)
-      final perguntaAtual = quizQuestions[currentQuestionIndex];
-      final List<String> alternativas = List<String>.from(
-        perguntaAtual["opcoes"] ?? [],
-      );
-      final String textoSelecionado = alternativas[respostaUsuario];
-      correta = (textoSelecionado == (respostaCorretaEsperada as String));
-    } else if (respostaUsuario is String && respostaCorretaEsperada is String) {
-      // Fase 2: Banco de Palavras (resposta é a string montada)
-      correta =
-          (respostaUsuario.replaceAll(' ', '') ==
-          respostaCorretaEsperada.replaceAll(' ', ''));
-    } else if (respostaUsuario is List && respostaCorretaEsperada is List) {
-      // Fase 3: Drag & Drop (compara as duas listas)
-      correta = const ListEquality().equals(
-        respostaUsuario,
-        respostaCorretaEsperada,
-      );
-    } else {
-      correta = false;
-    }
-
-    if (correta) {
-      setState(() {
-        acertos++;
-      });
+  Future<void> _handleAnswer(dynamic respostaUsuario, dynamic respostaCorretaEsperada) async {
+    if (respostaEnviada || !_started) return;
+    setState(() => respostaEnviada = true);
+    final question = quizQuestions[currentQuestionIndex];
+    final answer = respostaUsuario is int
+        ? (question['opcoes'] as List)[respostaUsuario] : respostaUsuario;
+    late bool correta;
+    try {
+      final response = await http.post(Uri.parse('$_baseUrl/game/answer'),
+        headers: {'Content-Type': 'application/json'}, body: jsonEncode({
+          'attempt_id': question['attempt_id'], 'index': currentQuestionIndex, 'answer': answer,
+        }));
+      if (!mounted || _finalizando || _finalizado) return;
+      if (response.statusCode != 200) {
+        throw http.ApiException(http.errorMessage(response, 'Não foi possível verificar a resposta.'));
+      }
+      final data = jsonDecode(response.body);
+      correta = data['correct'] == true;
+      setState(() => acertos = (data['score'] as num).toInt());
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(minutes: 5),
+        content: Text(error is http.ApiException ? error.message : 'Conexão interrompida. Verifique se a resposta foi salva.'),
+        action: SnackBarAction(label: 'Verificar envio', onPressed: _iniciarTimer),
+      ));
+      return;
     }
 
     final bool isLast = currentQuestionIndex == quizQuestions.length - 1;
@@ -348,11 +380,16 @@ class _DesafioPageState extends State<DesafioPage> {
   // --- Lógica de Finalização e Resultado (Mantida) ---
 
   Future<void> _finalizarDesafio({bool porTempo = false}) async {
+    if (!mounted || _finalizando || _finalizado) return;
+    _finalizando = true;
     _timer?.cancel();
-    if (respostaEnviada) return;
     setState(() {
       respostaEnviada = true;
     });
+
+    final pageRoute = ModalRoute.of(context);
+    if (pageRoute != null) Navigator.of(context).popUntil((route) => route == pageRoute);
+    var loadingOpen = true;
 
     showDialog(
       context: context,
@@ -370,7 +407,7 @@ class _DesafioPageState extends State<DesafioPage> {
 
     try {
       String endpoint = "/desafio/finalizar";
-      Map<String, dynamic> body = {"email": _userEmail, "pontuacao": acertos};
+      Map<String, dynamic> body = {'attempt_id': quizQuestions.first['attempt_id']};
 
       final response = await http.post(
         Uri.parse("$_baseUrl$endpoint"),
@@ -380,8 +417,10 @@ class _DesafioPageState extends State<DesafioPage> {
 
       if (!mounted) return;
       Navigator.pop(context); // Fecha o loading
+      loadingOpen = false;
 
       if (response.statusCode == 200) {
+        _finalizado = true;
         final data = jsonDecode(response.body);
         final String statusFinal = data["status_final"] ?? "CONCLUIDO";
         final String mensagem = porTempo
@@ -390,10 +429,8 @@ class _DesafioPageState extends State<DesafioPage> {
         final int rankChange = (data["rank_change"] as num? ?? 0).toInt();
         final int moedasGanhas = (data["moedas_ganhas"] as num? ?? 0).toInt();
 
-        Provider.of<UserProvider>(
-          context,
-          listen: false,
-        ).applyBattleRewards(rankChange, moedasGanhas);
+        await context.read<UserProvider>().loadUserData(_userEmail);
+        if (!mounted) return;
 
         _showResultadoFinalDialog(
           statusFinal,
@@ -402,13 +439,17 @@ class _DesafioPageState extends State<DesafioPage> {
           moedasGanhas,
         );
       } else {
-        final data = jsonDecode(response.body);
-        throw Exception(data['detail'] ?? "Erro ao finalizar desafio");
+        throw http.ApiException(http.errorMessage(response, 'Não foi possível enviar o resultado.'));
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context);
-      print("Erro ao finalizar desafio: $e");
-      _showResultadoFinalDialog("ERRO", "Erro ao enviar placar: $e", 0, 0);
+      if (!mounted) return;
+      if (loadingOpen) Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e is http.ApiException ? e.message : 'Não foi possível enviar o resultado.'),
+        action: SnackBarAction(label: 'Tentar novamente', onPressed: () => _finalizarDesafio(porTempo: porTempo)),
+      ));
+    } finally {
+      _finalizando = false;
     }
   }
 
@@ -438,6 +479,9 @@ class _DesafioPageState extends State<DesafioPage> {
 
   Widget _buildQuizBody() {
     if (quizQuestions.isEmpty) return const Expanded(child: SizedBox());
+    if (currentQuestionIndex >= quizQuestions.length) {
+      return const Expanded(child: Center(child: Text('Todas as respostas foram salvas. Finalizando resultado…')));
+    }
 
     final Map<String, dynamic> perguntaAtual =
         quizQuestions[currentQuestionIndex];
@@ -784,7 +828,7 @@ class _DesafioPageState extends State<DesafioPage> {
 
   // 🚀 6. ATUALIZADO: Botão de Envio (agora valida a Fase 3)
   Widget _buildSubmitButton() {
-    final Map<String, dynamic>? perguntaAtual = quizQuestions.isNotEmpty
+    final Map<String, dynamic>? perguntaAtual = currentQuestionIndex < quizQuestions.length
         ? quizQuestions[currentQuestionIndex]
         : null;
     final int fase = perguntaAtual?["fase"] ?? 1;

@@ -5,13 +5,13 @@ load_dotenv()
 
 API_KEY = os.getenv("GEMINI_API_KEY")
 
-if not API_KEY:
-    raise ValueError(" Variável APIKEY não configurada no .env")
-
-genai.configure(api_key=API_KEY)
+if API_KEY:
+    genai.configure(api_key=API_KEY)
 
 
 def gerar_explicacao(pergunta: str, resposta_correta: str, resposta_usuario: str, acertou: bool, prompts_persona: dict) -> str:
+    if not API_KEY:
+        raise RuntimeError("Feedback por IA temporariamente indisponível.")
   
     # 1. Escolhe o prompt de acordo com o resultado 
     prompt_base = prompts_persona["acerto"] if acertou else prompts_persona["erro"]

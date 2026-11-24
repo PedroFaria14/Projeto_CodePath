@@ -3,11 +3,10 @@
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'package:intl/intl.dart'; // Importe o pacote intl
 import 'login.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'home.dart';
 
 class Cadastro extends StatefulWidget {
   const Cadastro({super.key});
@@ -46,7 +45,7 @@ class _CadastroState extends State<Cadastro> {
       ), // Opcional: para calendário em português
     );
 
-    if (dataSelecionada != null) {
+    if (dataSelecionada != null && mounted) {
       // Formata a data para YYYY-MM-DD
       final String dataFormatada = DateFormat(
         'yyyy-MM-dd',
@@ -58,6 +57,7 @@ class _CadastroState extends State<Cadastro> {
   }
 
   Future<void> cadastrarUsuario() async {
+    if (isLoading) return;
     // --- Validações no Frontend ---
     if (nomeController.text.trim().isEmpty ||
         dataNascimentoController.text.trim().isEmpty ||
@@ -79,13 +79,20 @@ class _CadastroState extends State<Cadastro> {
       );
       return; // Impede o envio para a API
     }
+    if (senhaController.text.length < 8 || utf8.encode(senhaController.text).length > 72 ||
+        !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(emailController.text.trim())) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Use um e-mail válido e uma senha de 8 a 72 bytes.'),
+      ));
+      return;
+    }
     // --- Fim das Validações ---
 
     setState(() => isLoading = true);
 
     try {
       final url = Uri.parse(
-        "https://projeto-codepath.onrender.com/register",
+        "${AppConfig.apiBaseUrl}/register",
       ); // Seu endpoint
       final response = await http.post(
         url,
@@ -96,34 +103,26 @@ class _CadastroState extends State<Cadastro> {
               .trim(), // Já está formatada
           "telefone": telefoneController.text.trim(),
           "email": emailController.text.trim(),
-          "senha": senhaController.text
-              .trim(), // Envia apenas a senha principal
+          "senha": senhaController.text,
         }),
       );
 
       // Tratamento da resposta (sem alterações na lógica principal)
       if (!mounted) return; // Verifica se o widget ainda está montado
 
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && data["success"] == true) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString("userEmail", emailController.text.trim());
+      if (response.statusCode == 200 && jsonDecode(response.body)["success"] == true) {
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Cadastro realizado com sucesso!")),
+          const SnackBar(content: Text("Cadastro realizado! Entre para começar.")),
         );
         // Navega para Login substituindo a tela atual
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const PaginaHome()),
+          MaterialPageRoute(builder: (_) => const Login()),
         );
       } else {
         // Tenta pegar a mensagem de detalhe do HTTPException do FastAPI
-        String errorMessage =
-            data["detail"] ??
-            data["message"] ??
-            "Erro desconhecido ao cadastrar";
+        final errorMessage = http.errorMessage(response, 'Não foi possível cadastrar. Tente novamente.');
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text("❌ $errorMessage")));
@@ -132,7 +131,7 @@ class _CadastroState extends State<Cadastro> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("Erro de conexão: $e")));
+      ).showSnackBar(SnackBar(content: Text(e is http.ApiException ? e.message : 'Não foi possível cadastrar. Tente novamente.')));
     } finally {
       if (mounted) {
         setState(() => isLoading = false);

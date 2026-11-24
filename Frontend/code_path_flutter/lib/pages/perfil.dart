@@ -3,7 +3,9 @@
 import 'dart:convert';
 import 'package:codepath/pages/EditarPerfil.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
+import 'package:codepath/core/session_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'login.dart';
@@ -33,7 +35,7 @@ class _PerfilPageState extends State<PerfilPage> {
   int _totalConvites = 0;
   int _amigosCount = 0;
 
-  final String _baseUrl = "https://projeto-codepath.onrender.com";
+  final String _baseUrl = AppConfig.apiBaseUrl;
 
   @override
   void initState() {
@@ -118,10 +120,15 @@ class _PerfilPageState extends State<PerfilPage> {
   // --- (Função logout - sem alterações) ---
   void logout() async {
     //... (seu código de logout)
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    try {
+      await http.post(Uri.parse('${AppConfig.apiBaseUrl}/logout'));
+    } catch (_) {
+      // A saída local deve funcionar mesmo sem conexão.
+    }
+    await SessionStore.clear();
 
     if (!mounted) return;
+    context.read<UserProvider>().reset();
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const Login()),
@@ -303,7 +310,7 @@ class _PerfilPageState extends State<PerfilPage> {
                                       ),
                                     ),
                                   );
-                                  if (atualizou == true && mounted) {
+                                  if (atualizou == true && context.mounted) {
                                     // 🚀 AVISA O PROVIDER PARA RECARREGAR
                                     Provider.of<UserProvider>(
                                       context,

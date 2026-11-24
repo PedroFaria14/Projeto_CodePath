@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import datetime
 from firebase_config import db
 from google.cloud.firestore_v1.base_query import FieldFilter
+from security import public_user
 
 router = APIRouter()
 
@@ -27,8 +28,7 @@ async def get_user_profile(user_email: str):
             raise HTTPException(status_code=404, detail="Usuário não encontrado.")
 
         user_doc = query[0]
-        user_data = user_doc.to_dict()
-        user_data.pop('senha', None)  # remove a senha antes de enviar
+        user_data = public_user(user_doc.to_dict())
 
         return ApiResponse(
             success=True,
@@ -36,5 +36,7 @@ async def get_user_profile(user_email: str):
             user=user_data
         )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ocorreu um erro ao buscar o perfil do usuário: {e}")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Não foi possível carregar o perfil.")

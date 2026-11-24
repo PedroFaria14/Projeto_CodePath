@@ -4,9 +4,9 @@
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'amigos_busca_page.dart';
 import 'batalha_page.dart';
 
 class AmigosPage extends StatefulWidget {
@@ -33,7 +33,7 @@ class _AmigosPageState extends State<AmigosPage>
   String _userNivel = "iniciante";
   final TextEditingController _buscaController = TextEditingController();
 
-  final String _baseUrl = "https://projeto-codepath.onrender.com";
+  final String _baseUrl = AppConfig.apiBaseUrl;
 
   @override
   void initState() {
@@ -135,7 +135,7 @@ class _AmigosPageState extends State<AmigosPage>
   }
 
   Future<void> _desafiarAmigo(String emailAmigo, String nomeAmigo) async {
-    print("Desafiando $nomeAmigo ($emailAmigo)");
+    debugPrint('Enviando convite de batalha.');
     setState(() => _carregandoAmigos = true);
 
     try {

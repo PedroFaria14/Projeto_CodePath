@@ -1,6 +1,7 @@
 # Arquivo: pages/batalha.py (ATUALIZADO PARA MIX DE 3 TIPOS)
 
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Request
+from games import start_attempt
 from pydantic import BaseModel
 import datetime
 from firebase_config import db
@@ -50,6 +51,7 @@ class BatalhaNotificacao(BaseModel):
     moedas_ganhas: int
     lido: bool
     timestamp: datetime.datetime
+    match_id: Optional[str] = None
 
 # ===========================================================
 # 🚀 NOVA FUNÇÃO: BUSCA OS 3 TIPOS DE PERGUNTA
@@ -158,7 +160,7 @@ async def atualizar_moedas(email: str, quantidade: int):
     })
 
 @router.post("/batalha/iniciar", response_model=BatalhaInitResponse, tags=["Batalha Ranqueada"])
-async def iniciar_batalha(payload: BatalhaInitRequest):
+async def iniciar_batalha(payload: BatalhaInitRequest, request: Request):
     try:
         rank_jogador_atual = await get_rank_score(payload.email)
         rank_min = rank_jogador_atual - 100
@@ -166,12 +168,18 @@ async def iniciar_batalha(payload: BatalhaInitRequest):
         fila_ref_query = db.collection("batalha_queue").where(
             filter=FieldFilter("status", "==", "aguardando_oponente")
         ).where(
+            filter=FieldFilter("schema_version", "==", 2)
+        ).where(
             filter=FieldFilter("rank_score_jogador", ">=", rank_min)
         ).where(
             filter=FieldFilter("rank_score_jogador", "<=", rank_max)
-        ).limit(1)
+        ).limit(10)
         
-        fila_docs = list(fila_ref_query.stream())
+        now = datetime.datetime.now(datetime.timezone.utc)
+        fila_docs = [doc for doc in fila_ref_query.stream()
+                     if doc.to_dict().get('email_jogador') != payload.email
+                     and (doc.to_dict().get('reserved_until') is None
+                          or doc.to_dict()['reserved_until'] <= now)]
         perguntas_para_jogador = await get_perguntas_aleatorias(payload.nivel, 10) 
         
         if fila_docs:
@@ -180,24 +188,29 @@ async def iniciar_batalha(payload: BatalhaInitRequest):
             if oponente_data.get("email_jogador") == payload.email:
                  pass 
             else:
+                perguntas_publicas = start_attempt(db, request.state.identity.user_id, payload.email,
+                    'battle', oponente_data['questions'], {'opponent_id': oponente_doc.id})
                 return BatalhaInitResponse(
                     tipo_batalha="DESAFIO_EXISTENTE",
-                    perguntas=perguntas_para_jogador,
+                    perguntas=perguntas_publicas,
                     id_batalha_oponente=oponente_doc.id,
                     pontuacao_oponente=oponente_data.get("pontuacao")
                 )
         return BatalhaInitResponse(
             tipo_batalha="NOVA_BATALHA",
-            perguntas=perguntas_para_jogador,
+            perguntas=start_attempt(db, request.state.identity.user_id, payload.email,
+                                    'battle', perguntas_para_jogador),
             id_batalha_oponente=None,
             pontuacao_oponente=None
         )
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"❌ Erro ao iniciar batalha: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/batalha/finalizar", tags=["Batalha Ranqueada"])
+# Implementação legada preservada para referência; a rota ativa está em games.py.
 async def finalizar_batalha(payload: BatalhaFinalizarRequest):
     try:
         rank_jogador_atual = await get_rank_score(payload.email)

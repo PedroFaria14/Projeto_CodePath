@@ -2,7 +2,8 @@
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class LeaderboardPage extends StatefulWidget {
@@ -15,7 +16,7 @@ class LeaderboardPage extends StatefulWidget {
 class _LeaderboardPageState extends State<LeaderboardPage> {
   List<Map<String, dynamic>> _leaderboard = [];
   bool _carregando = true;
-  final String _baseUrl = "https://projeto-codepath.onrender.com";
+  final String _baseUrl = AppConfig.apiBaseUrl;
 
   @override
   void initState() {

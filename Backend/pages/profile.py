@@ -50,7 +50,6 @@ INITIAL_FASES = {
 
 # --- Endpoints de Perfil ---
 
-@router.get("/profile/{email}")
 async def get_profile(email: str):
     """
     Busca os dados de perfil do usuário, calcula a idade
@@ -100,6 +99,8 @@ async def get_profile(email: str):
 
         return {"success": True, "message": "Perfil encontrado.", "user": user_data}
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Erro ao carregar perfil: {e}")
         return ApiResponse(success=False, message="Erro ao carregar perfil.").model_dump()
@@ -131,6 +132,8 @@ async def update_profile(email: str, payload: UpdateProfilePayload = Body(...)):
         # 5. Retorne uma resposta de sucesso
         return {"success": True, "message": "Perfil atualizado com sucesso."}
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Erro ao atualizar perfil: {e}")
         raise HTTPException(status_code=500, detail="Erro interno ao atualizar o perfil.")

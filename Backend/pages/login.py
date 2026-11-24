@@ -1,20 +1,32 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 import datetime
 from firebase_config import db
 import bcrypt 
+from google.cloud.firestore_v1 import DELETE_FIELD
+from security import create_session, public_user, migrate_legacy_credential
 
 router = APIRouter()
 
 # (Modelos UserLogin e ApiResponse)
 class UserLogin(BaseModel):
-    email: str
-    senha: str
+    email: str = Field(min_length=3, max_length=254)
+    senha: str = Field(min_length=1, max_length=72)
+
+    @field_validator("senha")
+    @classmethod
+    def password_byte_limit(cls, value):
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Senha excede o limite suportado.")
+        return value
 
 class ApiResponse(BaseModel):
     success: bool
     message: str
     user: dict = None
+    access_token: str
+    token_type: str
+    expires_in: int
 
 # (Funções hash_password e verify_password)
 def hash_password(password: str) -> str:
@@ -47,7 +59,7 @@ INITIAL_FASES = {
 }
 
 @router.post("/login", response_model=ApiResponse)
-async def login_user(user: UserLogin):
+def login_user(user: UserLogin):
     if not db:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco de dados.")
 
@@ -75,11 +87,12 @@ async def login_user(user: UserLogin):
             if user_data['senha'] == user.senha:
                 # Senha antiga (texto puro) bateu.
                 # Atualiza o banco com o hash para o futuro.
-                user_doc.reference.update({'senha_hash': hash_password(user.senha)})
+                migrated_hash = hash_password(user.senha)
+                migrate_legacy_credential(db, user_doc.reference, user.senha, migrated_hash)
                 login_sucesso = True
                 
                 # (Opcional: Adicionar o hash ao user_data para a lógica de 'fases' funcionar)
-                user_data['senha_hash'] = hash_password(user.senha)
+                user_data['senha_hash'] = migrated_hash
 
         if not login_sucesso:
             # Se nenhum dos caminhos deu certo, o login falha.
@@ -132,12 +145,15 @@ async def login_user(user: UserLogin):
         })
 
         user_data['streak'] = streak
-        user_data.pop('senha', None)
-        user_data.pop('senha_hash', None)
+        # A sessão é vinculada à credencial que acabou de ser verificada.
+        # Um reset concorrente revoga esta versão, mesmo se ocorrer antes da emissão.
+        session = create_session(db, user_doc.reference.get(), verified_data=user_data)
+        return {"success": True, "message": "Login bem-sucedido!",
+                "user": public_user(user_data), **session}
 
-        return {"success": True, "message": "Login bem-sucedido!", "user": user_data}
-
+    except HTTPException:
+        raise
     except Exception as e:
         # Isso vai capturar o 'Invalid salt' se ele acontecer de novo
         # e informar o frontend
-        raise HTTPException(status_code=500, detail=f"Ocorreu um erro ao verificar o login: {e}")
+        raise HTTPException(status_code=500, detail="Não foi possível entrar. Tente novamente.")

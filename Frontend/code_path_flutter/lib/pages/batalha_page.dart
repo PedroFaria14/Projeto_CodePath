@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:codepath/providers/user_provider.dart';
-import 'package:collection/collection.dart';
 
 class BatalhaPage extends StatefulWidget {
   final List<Map<String, dynamic>> perguntas;
@@ -35,12 +35,15 @@ class _BatalhaPageState extends State<BatalhaPage> {
   int acertos = 0;
   bool carregando = true;
   bool respostaEnviada = false;
+  bool _finalizando = false;
+  bool _finalizada = false;
+  DateTime? _deadline;
 
   Timer? _timer;
   int _segundosRestantes = 120;
   final Stopwatch _stopwatch = Stopwatch();
   String _userEmail = "";
-  final String _baseUrl = "https://projeto-codepath.onrender.com";
+  final String _baseUrl = AppConfig.apiBaseUrl;
 
   // Estados Gerais
   String _perguntaTipoAtual = "";
@@ -75,24 +78,51 @@ class _BatalhaPageState extends State<BatalhaPage> {
   Future<void> _iniciarBatalha() async {
     final prefs = await SharedPreferences.getInstance();
     _userEmail = prefs.getString("userEmail") ?? "";
+    if (!mounted) return;
     if (_userEmail.isEmpty || widget.perguntas.isEmpty) {
       if (mounted) Navigator.of(context).pop();
       return;
     }
     setState(() {
       quizQuestions = widget.perguntas;
-      carregando = false;
     });
-    _loadCurrentQuestion();
-    _iniciarTimer();
+    await _iniciarTimer();
     _stopwatch.start();
   }
 
-  void _iniciarTimer() {
+  Future<void> _iniciarTimer() async {
+    try {
+      final response = await http.post(Uri.parse('$_baseUrl/game/start'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'attempt_id': quizQuestions.first['attempt_id']}));
+      if (!mounted || _finalizando || _finalizada) return;
+      if (response.statusCode != 200) {
+        throw http.ApiException(http.errorMessage(response, 'Não foi possível iniciar a partida.'));
+      }
+      final data = jsonDecode(response.body);
+      _deadline = DateTime.parse(data['deadline'] as String);
+      setState(() {
+        currentQuestionIndex = (data['next_index'] as num).toInt();
+        acertos = (data['score'] as num).toInt();
+        _segundosRestantes = _deadline!.difference(DateTime.now()).inSeconds.clamp(0, 120);
+        carregando = false;
+      });
+      _loadCurrentQuestion();
+      if (_finalizando || _finalizada) return;
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error is http.ApiException ? error.message : 'Não foi possível iniciar a partida.'),
+        action: SnackBarAction(label: 'Tentar novamente', onPressed: _iniciarTimer),
+      ));
+      return;
+    }
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_segundosRestantes > 0) {
+      final remaining = _deadline!.difference(DateTime.now()).inSeconds.clamp(0, 120);
+      if (remaining > 0) {
         if (mounted) {
-          setState(() => _segundosRestantes--);
+          setState(() => _segundosRestantes = remaining);
         }
       } else {
         timer.cancel();
@@ -140,33 +170,42 @@ class _BatalhaPageState extends State<BatalhaPage> {
     });
   }
 
-  void _validarResposta() {
-    if (respostaEnviada) return;
-
+  Future<void> _validarResposta() async {
+    if (respostaEnviada || _finalizando || _finalizada) return;
     final perguntaAtual = quizQuestions[currentQuestionIndex];
-    bool correta = false;
-
-    if (_perguntaTipoAtual == "multipla_escolha") {
+    Object answer;
+    if (_perguntaTipoAtual == 'multipla_escolha') {
       if (alternativaSelecionada == null) return;
-      final opcoes = List<String>.from(perguntaAtual["opcoes"]);
-      final escolhida = opcoes[alternativaSelecionada!];
-      correta = (escolhida == perguntaAtual["resposta_correta"]);
-    } else if (_perguntaTipoAtual == "codigo_snippet_word_bank") {
-      final respostaUsuario = _palavrasSelecionadas.join("");
-      final respostaCorreta = (perguntaAtual["resposta_correta"] ?? "")
-          .replaceAll(' ', '');
-      correta = (respostaUsuario.replaceAll(' ', '') == respostaCorreta);
-    } else if (_perguntaTipoAtual == "drag_and_drop") {
-      correta = const ListEquality().equals(
-        _blocosParaOrdenar,
-        _blocosOrdemCorreta,
-      );
+      answer = (perguntaAtual['opcoes'] as List)[alternativaSelecionada!];
+    } else if (_perguntaTipoAtual == 'codigo_snippet_word_bank') {
+      answer = _palavrasSelecionadas.join('');
+    } else {
+      answer = List<String>.from(_blocosParaOrdenar);
     }
-
-    setState(() {
-      respostaEnviada = true;
-      if (correta) acertos++;
-    });
+    setState(() => respostaEnviada = true);
+    late bool correta;
+    try {
+      final response = await http.post(Uri.parse('$_baseUrl/game/answer'),
+        headers: {'Content-Type': 'application/json'}, body: jsonEncode({
+          'attempt_id': perguntaAtual['attempt_id'], 'index': currentQuestionIndex, 'answer': answer,
+        }));
+      if (!mounted || _finalizando || _finalizada) return;
+      if (response.statusCode != 200) {
+        throw http.ApiException(http.errorMessage(response, 'Não foi possível verificar a resposta.'));
+      }
+      final data = jsonDecode(response.body);
+      correta = data['correct'] == true;
+      setState(() => acertos = (data['score'] as num).toInt());
+    } catch (error) {
+      if (!mounted) return;
+      // Antes de editar ou reenviar, reconcilia o próximo índice com o servidor.
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(minutes: 5),
+        content: Text(error is http.ApiException ? error.message : 'Conexão interrompida. Verifique se a resposta foi salva.'),
+        action: SnackBarAction(label: 'Verificar envio', onPressed: _iniciarTimer),
+      ));
+      return;
+    }
 
     final bool isLast = currentQuestionIndex == quizQuestions.length - 1;
 
@@ -194,11 +233,16 @@ class _BatalhaPageState extends State<BatalhaPage> {
   }
 
   Future<void> _finalizarBatalha({bool porTempo = false}) async {
+    if (!mounted || _finalizando || _finalizada) return;
+    _finalizando = true;
     _timer?.cancel();
     _stopwatch.stop();
-    final double tempoGasto = _stopwatch.elapsedMilliseconds / 1000.0;
 
     if (porTempo) setState(() => respostaEnviada = true);
+
+    final pageRoute = ModalRoute.of(context);
+    if (pageRoute != null) Navigator.of(context).popUntil((route) => route == pageRoute);
+    var loadingOpen = true;
 
     // Loading inicial
     showDialog(
@@ -215,19 +259,12 @@ class _BatalhaPageState extends State<BatalhaPage> {
       if (widget.tipoBatalha == "ALEATORIA") {
         endpoint = "/batalha/finalizar";
         body = {
-          "email": _userEmail,
-          "pontuacao": acertos,
-          "tempo_gasto_segundos": tempoGasto,
-          "id_batalha_oponente": widget.idBatalhaOponente,
-          "pontuacao_oponente": widget.pontuacaoOponente,
+          'attempt_id': quizQuestions.first['attempt_id'],
         };
       } else {
         endpoint = "/convite/finalizar";
         body = {
-          "id_convite": widget.idConvite,
-          "email_jogador": _userEmail,
-          "pontuacao": acertos,
-          "tempo_gasto_segundos": tempoGasto,
+          'attempt_id': quizQuestions.first['attempt_id'],
         };
       }
 
@@ -239,8 +276,10 @@ class _BatalhaPageState extends State<BatalhaPage> {
 
       if (!mounted) return;
       Navigator.pop(context); // Fecha o loading
+      loadingOpen = false;
 
       if (response.statusCode == 200) {
+        _finalizada = true;
         final data = jsonDecode(response.body);
         final String statusFinal = data["status_final"] ?? "CONCLUIDO";
 
@@ -249,10 +288,8 @@ class _BatalhaPageState extends State<BatalhaPage> {
         final String mensagem = data["message"] ?? "Aguardando...";
 
         if (statusFinal != "AGUARDANDO_OPONENTE") {
-          Provider.of<UserProvider>(
-            context,
-            listen: false,
-          ).applyBattleRewards(rankChange, moedasGanhas);
+          await context.read<UserProvider>().loadUserData(_userEmail);
+          if (!mounted) return;
         }
 
         // 🚀 ABRE O DIALOG QUE SE ATUALIZA SOZINHO
@@ -266,6 +303,7 @@ class _BatalhaPageState extends State<BatalhaPage> {
             moedasInicial: moedasGanhas,
             userEmail: _userEmail,
             baseUrl: _baseUrl,
+            matchId: data['match_id'] as String?,
             // 🚀 CORREÇÃO AQUI: Garante que fecha o dialog e a tela de batalha
             onClose: () {
               Navigator.of(ctx).pop(); // Fecha o Dialog
@@ -280,11 +318,17 @@ class _BatalhaPageState extends State<BatalhaPage> {
           ),
         );
       } else {
-        throw Exception("Erro ${response.statusCode}");
+        throw http.ApiException(http.errorMessage(response, 'Não foi possível enviar o resultado.'));
       }
     } catch (e) {
-      if (mounted && Navigator.canPop(context)) Navigator.pop(context);
-      print("Erro ao finalizar: $e");
+      if (!mounted) return;
+      if (loadingOpen) Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e is http.ApiException ? e.message : 'Não foi possível enviar o resultado.'),
+        action: SnackBarAction(label: 'Tentar novamente', onPressed: () => _finalizarBatalha(porTempo: porTempo)),
+      ));
+    } finally {
+      _finalizando = false;
     }
   }
 
@@ -387,6 +431,9 @@ class _BatalhaPageState extends State<BatalhaPage> {
   }
 
   Widget _buildQuizBody() {
+    if (currentQuestionIndex >= quizQuestions.length) {
+      return const Expanded(child: Center(child: Text('Todas as respostas foram salvas. Finalizando resultado…')));
+    }
     Widget questionWidget;
     if (_perguntaTipoAtual == "multipla_escolha") {
       questionWidget = _buildMultipleChoice();
@@ -480,6 +527,10 @@ class _BatalhaPageState extends State<BatalhaPage> {
               style: GoogleFonts.sourceCodePro(fontSize: 16),
             ),
           ),
+        ),
+        if (_fase2Dica.isNotEmpty) Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Text('Dica: $_fase2Dica', textAlign: TextAlign.center),
         ),
         const SizedBox(height: 20),
         Container(
@@ -621,6 +672,7 @@ class _BatalhaPageState extends State<BatalhaPage> {
   }
 
   Widget _buildSubmitButton() {
+    if (currentQuestionIndex >= quizQuestions.length) return const SizedBox.shrink();
     bool canSubmit = false;
     if (!respostaEnviada) {
       if (_perguntaTipoAtual == "multipla_escolha")
@@ -714,6 +766,7 @@ class ResultadoBatalhaDinamico extends StatefulWidget {
   final int moedasInicial;
   final String userEmail;
   final String baseUrl;
+  final String? matchId;
   final VoidCallback onClose;
 
   const ResultadoBatalhaDinamico({
@@ -724,6 +777,7 @@ class ResultadoBatalhaDinamico extends StatefulWidget {
     required this.moedasInicial,
     required this.userEmail,
     required this.baseUrl,
+    this.matchId,
     required this.onClose,
   });
 
@@ -739,6 +793,7 @@ class _ResultadoBatalhaDinamicoState extends State<ResultadoBatalhaDinamico> {
   late int _moedas;
   Timer? _timer;
   bool _isWaiting = false;
+  bool _polling = false;
 
   @override
   void initState() {
@@ -762,7 +817,8 @@ class _ResultadoBatalhaDinamicoState extends State<ResultadoBatalhaDinamico> {
 
   void _iniciarPolling() {
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) async {
-      if (!mounted) return;
+      if (!mounted || _polling || WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) return;
+      _polling = true;
       try {
         final response = await http.get(
           Uri.parse(
@@ -771,7 +827,8 @@ class _ResultadoBatalhaDinamicoState extends State<ResultadoBatalhaDinamico> {
         );
 
         if (response.statusCode == 200) {
-          final List data = jsonDecode(response.body);
+          final List data = (jsonDecode(response.body) as List)
+              .where((item) => widget.matchId != null && item['match_id'] == widget.matchId).toList();
           if (data.isNotEmpty) {
             timer.cancel();
             final notif = data.first;
@@ -782,13 +839,8 @@ class _ResultadoBatalhaDinamicoState extends State<ResultadoBatalhaDinamico> {
             if (titulo.toUpperCase().contains("EMPATE")) novoStatus = "EMPATE";
 
             if (mounted) {
-              Provider.of<UserProvider>(
-                context,
-                listen: false,
-              ).applyBattleRewards(
-                (notif['rank_change'] as num).toInt(),
-                (notif['moedas_ganhas'] as num).toInt(),
-              );
+              await context.read<UserProvider>().loadUserData(widget.userEmail);
+              if (!mounted) return;
             }
 
             await http.post(
@@ -810,6 +862,8 @@ class _ResultadoBatalhaDinamicoState extends State<ResultadoBatalhaDinamico> {
         }
       } catch (e) {
         print("Polling error: $e");
+      } finally {
+        _polling = false;
       }
     });
   }

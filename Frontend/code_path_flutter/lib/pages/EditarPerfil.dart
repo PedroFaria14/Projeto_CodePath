@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 
 class EditarPerfilPage extends StatefulWidget {
   // Recebe os dados atuais do usuário para preencher os campos
@@ -68,7 +69,7 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
       // Chama o endpoint de atualização no backend
       final response = await http.put(
         Uri.parse(
-          "https://projeto-codepath.onrender.com/update_profile/$email",
+          "${AppConfig.apiBaseUrl}/update_profile/${Uri.encodeComponent(email)}",
         ),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({

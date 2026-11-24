@@ -7,7 +7,8 @@
 import 'dart:async'; // Importante para o Timer
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:codepath/providers/user_provider.dart';
@@ -40,10 +41,11 @@ class _PaginaHomeState extends State<PaginaHome> {
 
   String _userEmail = "";
   int _totalConvites = 0;
-  final String _baseUrl = "https://projeto-codepath.onrender.com";
+  final String _baseUrl = AppConfig.apiBaseUrl;
 
   bool _isUserDataLoading = false;
   Timer? _notificacaoTimer; // 🚀 O Radar!
+  bool _polling = false;
 
   // --- (Mapas de Metadados) ---
   final Map<String, String> _cardDisplayNames = {
@@ -168,24 +170,6 @@ class _PaginaHomeState extends State<PaginaHome> {
     return Color.lerp(startColor, endColor, t) ?? startColor;
   }
 
-  Color get _endColor {
-    if (modulos.isEmpty) return _defaultInfo["gradient"].last;
-    final startModuloIndex = _currentPage.floor();
-    final endModuloIndex = (_currentPage + 1).floor().clamp(
-      0,
-      modulos.length - 1,
-    );
-    final startModulo = modulos[startModuloIndex];
-    final startInfo = _moduloMetadata[startModulo] ?? _defaultInfo;
-    final startColor = startInfo["gradient"].last as Color;
-    if (startModuloIndex == endModuloIndex) return startColor;
-    final endModulo = modulos[endModuloIndex];
-    final endInfo = _moduloMetadata[endModulo] ?? _defaultInfo;
-    final endColor = endInfo["gradient"].last as Color;
-    final t = _currentPage - startModuloIndex;
-    return Color.lerp(startColor, endColor, t) ?? startColor;
-  }
-
   Map<String, String> get _moduloNameMap {
     return {
       "Laços de Repetição": "Laços de Repetição",
@@ -212,11 +196,18 @@ class _PaginaHomeState extends State<PaginaHome> {
     carregarModulos();
 
     // 🚀 RADAR: Inicia o timer para checar notificações a cada 10 segundos
-    _notificacaoTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    _notificacaoTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
       // Só checa se tiver email e estiver na tela
-      if (_userEmail.isNotEmpty && mounted) {
-        _checarNotificacoes();
-        _carregarContagemConvites(_userEmail);
+      if (_userEmail.isNotEmpty && mounted && !_polling &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
+          ModalRoute.of(context)?.isCurrent == true) {
+        _polling = true;
+        try {
+          await _checarNotificacoes();
+          if (mounted) await _carregarContagemConvites(_userEmail);
+        } finally {
+          _polling = false;
+        }
       }
     });
   }
@@ -279,6 +270,7 @@ class _PaginaHomeState extends State<PaginaHome> {
       final prefs = await SharedPreferences.getInstance();
       final email = prefs.getString("userEmail");
       _userEmail = email ?? "";
+      if (!mounted) return;
 
       if (_userEmail.isEmpty) {
         if (mounted) {
@@ -627,7 +619,7 @@ class _PaginaHomeState extends State<PaginaHome> {
         Uri.parse("$_baseUrl/notificacoes/pendentes/$_userEmail"),
       );
 
-      if (!mounted || response.statusCode != 200) return;
+      if (!mounted || response.statusCode != 200 || ModalRoute.of(context)?.isCurrent != true) return;
 
       final data = jsonDecode(response.body) as List;
       final List<Map<String, dynamic>> notificacoes = List.from(data);
@@ -657,10 +649,8 @@ class _PaginaHomeState extends State<PaginaHome> {
 
       // Atualiza provider local
       if (mounted) {
-        Provider.of<UserProvider>(
-          context,
-          listen: false,
-        ).applyBattleRewards(rankChange, moedasGanhas);
+        await context.read<UserProvider>().loadUserData(_userEmail);
+        if (!mounted) return;
       }
 
       if (!mounted) return;

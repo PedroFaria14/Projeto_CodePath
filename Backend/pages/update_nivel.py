@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import datetime
 from firebase_config import db
+from security import public_user
 from google.cloud.firestore_v1.base_query import FieldFilter
 from typing import Optional
 
@@ -91,9 +92,11 @@ async def set_global_level(request: GlobalLevelSetRequest):
         return ApiResponseProfileUpdate(
             success=True, 
             message="Nível global atualizado com sucesso!",
-            user=user_data
+            user=public_user(user_data)
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"❌ Erro ao definir nível global: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Não foi possível atualizar o nível.")

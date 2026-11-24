@@ -1,7 +1,8 @@
 // Arquivo: faseUmTrilha1.dart
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:codepath/core/api_http.dart' as http;
+import 'package:codepath/core/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 // Remova a importação de 'trilhaUm.dart' daqui se ela não for usada diretamente
@@ -206,7 +207,7 @@ class _QuestaoPageState extends State<QuestaoPage> {
 
       final response = await http.get(
         Uri.parse(
-          "https://projeto-codepath.onrender.com/pergunta/?nivel=$nivelFirebase&tipo=${Uri.encodeComponent(widget.tipoModulo)}&count=$count",
+          "${AppConfig.apiBaseUrl}/pergunta/?nivel=$nivelFirebase&tipo=${Uri.encodeComponent(widget.tipoModulo)}&count=$count",
         ),
       );
 
@@ -331,6 +332,7 @@ class _QuestaoPageState extends State<QuestaoPage> {
     final email = prefs.getString("userEmail");
     if (email == null) {
       print("QuestaoPage: Erro salvando progresso - email nulo."); // Log
+      if (!mounted) return;
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Erro: Usuário não logado.")),
@@ -342,9 +344,9 @@ class _QuestaoPageState extends State<QuestaoPage> {
 
     try {
       // --- Lógica para buscar perfil e calcular novas fases ---
-      print("QuestaoPage: Buscando perfil atual para $email"); // Log
+      debugPrint('Carregando progresso da trilha.');
       final profileResp = await http.get(
-        Uri.parse("https://projeto-codepath.onrender.com/profile/$email"),
+        Uri.parse("${AppConfig.apiBaseUrl}/profile/${Uri.encodeComponent(email)}"),
       );
 
       if (!mounted) return;
@@ -437,11 +439,11 @@ class _QuestaoPageState extends State<QuestaoPage> {
         "fases": moduleFasesCalculadas,
       };
       print(
-        "QuestaoPage: Salvando progresso no backend. Payload: $payload",
+        'Salvando progresso da trilha.',
       ); // Log
 
       final saveResp = await http.post(
-        Uri.parse("https://projeto-codepath.onrender.com/salvar_progresso"),
+        Uri.parse("${AppConfig.apiBaseUrl}/salvar_progresso"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(payload),
       );
@@ -507,7 +509,7 @@ class _QuestaoPageState extends State<QuestaoPage> {
 
     try {
       final response = await http.post(
-        Uri.parse("https://projeto-codepath.onrender.com/responder"),
+        Uri.parse("${AppConfig.apiBaseUrl}/responder"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "idPergunta": idPergunta,
